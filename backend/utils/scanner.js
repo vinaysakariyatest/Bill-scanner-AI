@@ -22,8 +22,9 @@ Return a JSON object with EXACTLY these keys:
 - customerGstNumber (string)
 - subTotal (number, total before tax)
 - taxAmount (number, sum of all taxes like GST/IGST/VAT)
-- totalAmount (number, final amount including tax)
-- items (array of objects with: productName, qty, price, amount)
+- discountAmount (number, overall discount/deduction applied to subtotal, 0 if none. Always return as a positive number)
+- totalAmount (number, final amount including tax and minus discount)
+- items (array of objects with: productName, qty, price, amount - DO NOT include overall discount as an item)
 
 Return ONLY pure raw JSON code without markdown backticks.`;
 
@@ -57,12 +58,17 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     if (!parsedData.items) parsedData.items = [];
     if (!parsedData.subTotal) parsedData.subTotal = 0;
     if (!parsedData.taxAmount) parsedData.taxAmount = 0;
+    if (!parsedData.discountAmount) parsedData.discountAmount = 0;
+    
+    // Ensure discount is always positive for logical subtraction
+    parsedData.discountAmount = Math.abs(Number(parsedData.discountAmount) || 0);
+
     if (!parsedData.totalAmount) parsedData.totalAmount = 0;
     
     // Manual fallback calculation on empty totals
     let calcAmount = parsedData.items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
     if (parsedData.subTotal === 0 && calcAmount > 0) parsedData.subTotal = calcAmount;
-    if (parsedData.totalAmount === 0 && calcAmount > 0) parsedData.totalAmount = calcAmount + Number(parsedData.taxAmount);
+    if (parsedData.totalAmount === 0 && calcAmount > 0) parsedData.totalAmount = calcAmount + Number(parsedData.taxAmount) - Number(parsedData.discountAmount);
 
     if (!parsedData.invoiceNumber) parsedData.invoiceNumber = `INV-${Math.floor(Math.random() * 1000)}`;
     if (!parsedData.vendorName) parsedData.vendorName = 'Unknown Vendor';
@@ -71,7 +77,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     return parsedData;
 
   } catch (error) {
-    console.error("AI Extraction Error:", error);
-    throw new Error("Failed to extract data. Ensure your Gemini API Key is valid and the image is clear.");
+    console.error("AI Extraction Error:", error.message || error);
+    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Gemini API Key is valid and the image is clear.`);
   }
 };

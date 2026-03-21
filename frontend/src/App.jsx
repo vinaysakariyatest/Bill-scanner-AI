@@ -47,10 +47,6 @@ function PublicLayout({ children }) {
           <Receipt className="text-primary-600 w-8 h-8 mr-3" />
           <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-400">BillScanner App</h1>
         </div>
-        <Link to="/login" className="flex items-center text-sm font-bold text-slate-500 hover:text-primary-600 bg-white px-5 py-2.5 rounded-xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
-          <LayoutDashboard className="w-4 h-4 mr-2" />
-          Admin Login
-        </Link>
       </header>
 
       <main className="flex-1 p-8 max-w-5xl mx-auto w-full z-10">

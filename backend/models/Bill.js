@@ -17,6 +17,7 @@ const billSchema = new mongoose.Schema({
   items: [itemSchema],
   subTotal: { type: Number, default: 0 },
   taxAmount: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
   totalAmount: { type: Number, required: true },
   date: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now }

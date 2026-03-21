@@ -26,7 +26,7 @@ exports.saveBill = async (req, res) => {
   try {
     const { 
       invoiceNumber, invoiceDate, vendorName, vendorGstNumber, 
-      customerName, customerGstNumber, subTotal, taxAmount, totalAmount, 
+      customerName, customerGstNumber, subTotal, taxAmount, discountAmount, totalAmount, 
       items, contactInfo 
     } = req.body;
 
@@ -57,6 +57,7 @@ exports.saveBill = async (req, res) => {
       items,
       subTotal,
       taxAmount,
+      discountAmount,
       totalAmount
     });
     await bill.save();

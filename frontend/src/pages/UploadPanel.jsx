@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -20,9 +20,25 @@ export default function UploadPanel() {
     customerGstNumber: '',
     subTotal: '',
     taxAmount: '',
+    discountAmount: '',
     totalAmount: '',
     items: []
   });
+
+  // Auto-calculate grand total
+  useEffect(() => {
+    const sub = Number(formData.subTotal) || 0;
+    const tax = Number(formData.taxAmount) || 0;
+    const disc = Number(formData.discountAmount) || 0;
+    // Grand Total = Subtotal + Tax - Discount
+    const total = Number((sub + tax - disc).toFixed(2));
+
+    if (total !== Number(formData.totalAmount)) {
+      setFormData(prev => ({ ...prev, totalAmount: total }));
+    }
+  }, [formData.subTotal, formData.taxAmount, formData.discountAmount]);
+
+  const itemsSum = formData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -53,6 +69,7 @@ export default function UploadPanel() {
         customerGstNumber: res.data.customerGstNumber || '',
         subTotal: res.data.subTotal || 0,
         taxAmount: res.data.taxAmount || 0,
+        discountAmount: res.data.discountAmount || 0,
         totalAmount: res.data.totalAmount || 0,
         items: res.data.items || []
       });
@@ -70,7 +87,14 @@ export default function UploadPanel() {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    const updatedItem = { ...newItems[index], [field]: value };
+
+    // Auto-calculate row amount
+    if (field === 'qty' || field === 'price') {
+      updatedItem.amount = (Number(updatedItem.qty) || 0) * (Number(updatedItem.price) || 0);
+    }
+
+    newItems[index] = updatedItem;
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
@@ -192,14 +216,29 @@ export default function UploadPanel() {
             </div>
 
             <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-4 border-b pb-2">Accounting Details</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Subtotal</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold text-slate-600">Subtotal</label>
+                  {itemsSum > 0 && itemsSum !== Number(formData.subTotal) && (
+                    <button 
+                      type="button" 
+                      onClick={() => setFormData(p => ({ ...p, subTotal: itemsSum }))}
+                      className="text-[10px] text-primary-500 hover:underline font-bold"
+                    >
+                      Sync Items ({itemsSum})
+                    </button>
+                  )}
+                </div>
                 <input type="number" step="0.01" name="subTotal" value={formData.subTotal} onChange={handleFormChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm font-medium outline-none transition-all" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600">Total Tax Amount</label>
                 <input type="number" step="0.01" name="taxAmount" value={formData.taxAmount} onChange={handleFormChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm font-medium outline-none transition-all" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Discount</label>
+                <input type="number" step="0.01" name="discountAmount" value={formData.discountAmount} onChange={handleFormChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm font-medium outline-none transition-all" />
               </div>
               <div className="space-y-1 bg-primary-50/50 p-2 -m-2 rounded-xl border border-primary-50">
                 <label className="text-xs font-bold text-primary-700 pl-2">Grand Total Amount</label>
@@ -212,6 +251,15 @@ export default function UploadPanel() {
               <button type="button" onClick={addItemRow} className="text-primary-600 hover:text-primary-700 normal-case">+ Add Item</button>
             </h4>
             <div className="space-y-2 mb-8">
+              {formData.items.length > 0 && (
+                <div className="flex gap-2 items-end shrink-0 mb-2 px-1">
+                  <div className="flex-1 min-w-[150px] text-xs font-semibold text-slate-500">Item Name</div>
+                  <div className="w-20 text-xs font-semibold text-slate-500 uppercase">Qty</div>
+                  <div className="w-24 text-xs font-semibold text-slate-500 uppercase">Rate</div>
+                  <div className="w-28 text-xs font-semibold text-slate-500 uppercase">Amount</div>
+                  <div className="w-9"></div>
+                </div>
+              )}
               {formData.items.map((item, index) => (
                 <div key={index} className="flex gap-2 items-start shrink-0">
                   <input type="text" value={item.productName} onChange={(e) => handleItemChange(index, 'productName', e.target.value)} className="flex-1 min-w-[150px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Item Name" />
