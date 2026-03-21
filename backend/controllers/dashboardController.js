@@ -7,21 +7,24 @@ exports.getDashboardData = async (req, res) => {
     
     // 1. Get all customers
     const customers = await Customer.find().lean();
+    console.log(`Found ${customers.length} customers`);
     
     // 2. We want to show how many bills and total amount each customer has
     const dashboardData = await Promise.all(customers.map(async (customer) => {
       let query = { customer: customer._id };
       
       // Add date filtering if month/year are provided
-      if (month && year) {
+      if (month && year && month !== 'all' && year !== 'all') {
         const monthStr = String(month).padStart(2, '0');
         const yearStr = String(year);
         // Match invoiceDate starting with YYYY-MM
         query.invoiceDate = { $regex: new RegExp(`^${yearStr}-${monthStr}`) };
+        console.log(`Filtering customer ${customer.name} with query:`, query);
       }
 
       const bills = await Bill.find(query).sort({ date: -1 }).lean();
-      const totalSpent = bills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+      const totalSpent = bills.reduce((sum, bill) => sum + (bill.totalAmount || 0), 0);
+      console.log(`Customer ${customer.name}: ${bills.length} bills, ${totalSpent} spent`);
       
       return {
         ...customer,

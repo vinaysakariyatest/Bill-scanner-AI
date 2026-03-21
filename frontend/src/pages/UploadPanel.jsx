@@ -40,22 +40,25 @@ export default function UploadPanel() {
 
   const itemsSum = formData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
       setError(null);
       setSuccess(false);
       setExtractedData(null);
+      
+      // Auto-upload
+      processFile(selectedFile);
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const processFile = async (fileToUpload) => {
     setProcessing(true);
     setError(null);
 
     const data = new FormData();
-    data.append('invoice', file);
+    data.append('invoice', fileToUpload);
 
     try {
       const res = await axios.post(`${API_BASE}/upload`, data);
@@ -80,6 +83,10 @@ export default function UploadPanel() {
     }
   };
 
+  const handleUpload = () => {
+    if (file) processFile(file);
+  };
+
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -101,7 +108,7 @@ export default function UploadPanel() {
   const addItemRow = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { productName: '', qty: 1, price: 0, amount: 0 }]
+      items: [...prev.items, { productName: '', hsnCode: '', qty: 1, price: 0, amount: 0 }]
     }));
   };
 
@@ -130,7 +137,7 @@ export default function UploadPanel() {
   };
 
   return (
-    <div className="w-full animation-fade-in relative pb-10">
+    <div className="w-full relative pb-10">
       <div className="mb-6">
         <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Upload Bill</h2>
         <p className="text-slate-500 mt-2 text-sm max-w-2xl text-balance">
@@ -153,14 +160,16 @@ export default function UploadPanel() {
           
           {file && (
             <div className="mt-8 flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center space-x-3 bg-slate-50 px-6 py-3 rounded-xl border border-slate-100 mb-6">
-                <FileText className="w-5 h-5 text-slate-400" />
-                <span className="text-sm font-medium text-slate-700 max-w-xs truncate">{file.name}</span>
+              <div className={`flex items-center space-x-3 px-6 py-3 rounded-xl border mb-6 transition-all ${processing ? 'bg-primary-50 border-primary-100 ring-4 ring-primary-50' : 'bg-slate-50 border-slate-100'}`}>
+                {processing ? <Loader2 className="w-5 h-5 text-primary-500 animate-spin" /> : <FileText className="w-5 h-5 text-slate-400" />}
+                <span className={`text-sm font-medium max-w-xs truncate ${processing ? 'text-primary-700' : 'text-slate-700'}`}>
+                  {processing ? 'AI is scanning your invoice...' : file.name}
+                </span>
               </div>
               
-              <button onClick={handleUpload} disabled={processing} className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-xl font-semibold shadow-lg flex items-center disabled:opacity-70">
-                {processing ? <><Loader2 className="w-5 h-5 mr-3 animate-spin"/> Processing with AI...</> : 'Scan and Extract'}
-              </button>
+              {processing && (
+                <p className="text-xs font-bold text-primary-500 animate-pulse uppercase tracking-widest">Please wait a moment...</p>
+              )}
             </div>
           )}
 
@@ -226,7 +235,7 @@ export default function UploadPanel() {
                       onClick={() => setFormData(p => ({ ...p, subTotal: itemsSum }))}
                       className="text-[10px] text-primary-500 hover:underline font-bold"
                     >
-                      Sync Items ({itemsSum})
+                      Sync Items (₹{itemsSum})
                     </button>
                   )}
                 </div>
@@ -254,6 +263,7 @@ export default function UploadPanel() {
               {formData.items.length > 0 && (
                 <div className="flex gap-2 items-end shrink-0 mb-2 px-1">
                   <div className="flex-1 min-w-[150px] text-xs font-semibold text-slate-500">Item Name</div>
+                  <div className="w-24 text-xs font-semibold text-slate-500 uppercase">HSN/SAC</div>
                   <div className="w-20 text-xs font-semibold text-slate-500 uppercase">Qty</div>
                   <div className="w-24 text-xs font-semibold text-slate-500 uppercase">Rate</div>
                   <div className="w-28 text-xs font-semibold text-slate-500 uppercase">Amount</div>
@@ -263,6 +273,7 @@ export default function UploadPanel() {
               {formData.items.map((item, index) => (
                 <div key={index} className="flex gap-2 items-start shrink-0">
                   <input type="text" value={item.productName} onChange={(e) => handleItemChange(index, 'productName', e.target.value)} className="flex-1 min-w-[150px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Item Name" />
+                  <input type="text" value={item.hsnCode} onChange={(e) => handleItemChange(index, 'hsnCode', e.target.value)} className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="HSN/SAC" />
                   <input type="number" value={item.qty} onChange={(e) => handleItemChange(index, 'qty', e.target.value)} className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Qty" />
                   <input type="number" value={item.price} onChange={(e) => handleItemChange(index, 'price', e.target.value)} className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Rate" />
                   <input type="number" value={item.amount} onChange={(e) => handleItemChange(index, 'amount', e.target.value)} className="w-28 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold" placeholder="Subtotal" />

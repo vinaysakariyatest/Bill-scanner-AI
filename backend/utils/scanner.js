@@ -24,7 +24,7 @@ Return a JSON object with EXACTLY these keys:
 - taxAmount (number, sum of all taxes like GST/IGST/VAT)
 - discountAmount (number, overall discount/deduction applied to subtotal, 0 if none. Always return as a positive number)
 - totalAmount (number, final amount including tax and minus discount)
-- items (array of objects with: productName, qty, price, amount - DO NOT include overall discount as an item)
+- items (array of objects with: productName, hsnCode, qty, price, amount - DO NOT include overall discount as an item)
 
 Return ONLY pure raw JSON code without markdown backticks.`;
 

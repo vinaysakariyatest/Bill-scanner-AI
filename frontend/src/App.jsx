@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { Receipt, LayoutDashboard, LogOut } from 'lucide-react';
+import { FileText, LayoutDashboard, LogOut } from 'lucide-react';
 import UploadPanel from './pages/UploadPanel';
 import DashboardPanel from './pages/DashboardPanel';
 import Login from './pages/Login';
@@ -16,7 +16,7 @@ function AdminLayout({ children }) {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center">
-          <Receipt className="text-primary-600 w-8 h-8 mr-3" />
+          <FileText className="text-primary-600 w-8 h-8 mr-3" />
           <h1 className="text-xl font-bold text-slate-800">BillScanner <span className="text-primary-500 font-extrabold">Admin</span></h1>
         </div>
         <div className="flex items-center gap-4">
@@ -37,15 +37,11 @@ function AdminLayout({ children }) {
 // Layout built for the public upload app
 function PublicLayout({ children }) {
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans relative overflow-hidden">
-      {/* Decorative background blurs */}
-      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-primary-100/40 via-blue-50/20 to-transparent -z-10 blur-3xl rounded-b-[100px]" />
-      <div className="absolute top-[20%] right-[-10%] w-96 h-96 bg-blue-200/30 -z-10 blur-[100px] rounded-full" />
-
-      <header className="px-8 py-6 flex justify-between items-center max-w-7xl mx-auto w-full z-10">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">
+      <header className="px-8 py-6 flex justify-between items-center max-w-7xl mx-auto w-full z-10 transition-all">
         <div className="flex items-center">
-          <Receipt className="text-primary-600 w-8 h-8 mr-3" />
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-400">BillScanner App</h1>
+          <FileText className="text-primary-600 w-8 h-8 mr-3" />
+          <h1 className="text-xl font-black text-slate-800 tracking-tight">BillScanner <span className="text-primary-600">App</span></h1>
         </div>
       </header>
 
