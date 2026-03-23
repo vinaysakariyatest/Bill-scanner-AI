@@ -69,7 +69,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
             ],
           },
         ],
-        model: "llama-3.2-90b-vision-preview",
+        model: "llama-3.2-11b-vision-preview",
         response_format: { type: "json_object" }
       });
       responseText = chatCompletion.choices[0].message.content;
