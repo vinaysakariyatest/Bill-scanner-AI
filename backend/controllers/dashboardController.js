@@ -14,11 +14,24 @@ exports.getDashboardData = async (req, res) => {
       let query = { customer: customer._id };
       
       // Add date filtering if month/year are provided
-      if (month && year && month !== 'all' && year !== 'all') {
-        const monthStr = String(month).padStart(2, '0');
-        const yearStr = String(year);
+      if (month && year && (month !== 'all' || year !== 'all') && month !== 'NaN') {
+        let regexPattern = '^';
+        if (year !== 'all') {
+          regexPattern += String(year);
+        } else {
+          regexPattern += '\\d{4}'; // Any 4-digit year
+        }
+        
+        regexPattern += '-';
+        
+        if (month !== 'all') {
+          regexPattern += String(month).padStart(2, '0');
+        } else {
+          regexPattern += '\\d{2}'; // Any 2-digit month
+        }
+        
         // Match invoiceDate starting with YYYY-MM
-        query.invoiceDate = { $regex: new RegExp(`^${yearStr}-${monthStr}`) };
+        query.invoiceDate = { $regex: new RegExp(regexPattern) };
         console.log(`Filtering customer ${customer.name} with query:`, query);
       }
 

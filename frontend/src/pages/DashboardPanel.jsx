@@ -97,7 +97,7 @@ export default function DashboardPanel() {
               <div className="flex items-center mt-3 space-x-3">
                 <select 
                   value={selectedMonth} 
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                   className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20"
                 >
                   <option value="all">Total (All Months)</option>
