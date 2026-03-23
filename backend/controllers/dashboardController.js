@@ -24,12 +24,14 @@ exports.getDashboardData = async (req, res) => {
 
       const bills = await Bill.find(query).sort({ date: -1 }).lean();
       const totalSpent = bills.reduce((sum, bill) => sum + (bill.totalAmount || 0), 0);
-      console.log(`Customer ${customer.name}: ${bills.length} bills, ${totalSpent} spent`);
+      const totalTax = bills.reduce((sum, bill) => sum + (bill.taxAmount || 0), 0);
+      console.log(`Customer ${customer.name}: ${bills.length} bills, ${totalSpent} spent, ${totalTax} tax`);
       
       return {
         ...customer,
         totalBills: bills.length,
         totalSpent,
+        totalTax,
         bills
       };
     }));

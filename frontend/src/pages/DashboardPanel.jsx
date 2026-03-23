@@ -56,6 +56,7 @@ export default function DashboardPanel() {
   };
 
   const totalRevenue = data.reduce((sum, cust) => sum + (cust.totalSpent || 0), 0);
+  const totalTax = data.reduce((sum, cust) => sum + (cust.totalTax || 0), 0);
   const totalBills = data.reduce((sum, cust) => sum + (cust.totalBills || 0), 0);
 
   const months = [
@@ -126,6 +127,15 @@ export default function DashboardPanel() {
                 </div>
               </div>
               <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center">
+                <div className="bg-orange-50 text-orange-600 p-2 rounded-lg mr-3">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 font-semibold uppercase">Total GST</p>
+                  <p className="font-bold text-lg text-slate-800">₹{totalTax.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center">
                 <div className="bg-blue-50 text-blue-600 p-2 rounded-lg mr-3">
                   <FileText className="w-5 h-5" />
                 </div>
@@ -158,6 +168,7 @@ export default function DashboardPanel() {
                     <th className="px-6 py-4 rounded-tl-3xl">Customer Name</th>
                     <th className="px-6 py-4 text-center">Bills</th>
                     <th className="px-6 py-4">Revenue Contribution</th>
+                    <th className="px-6 py-4">Total GST</th>
                     <th className="px-6 py-4 text-right rounded-tr-3xl">Details</th>
                   </tr>
                 </thead>
@@ -177,6 +188,9 @@ export default function DashboardPanel() {
                       </td>
                       <td className="px-6 py-5">
                         <span className="font-bold text-slate-700">₹{(customer.totalSpent || 0).toFixed(2)}</span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="font-bold text-orange-600">₹{(customer.totalTax || 0).toFixed(2)}</span>
                       </td>
                       <td className="px-6 py-5 text-right">
                         <button 
@@ -207,6 +221,10 @@ export default function DashboardPanel() {
               <div className="bg-blue-50 text-primary-700 px-4 py-2.5 rounded-xl border border-primary-100 flex items-center">
                 <p className="text-[10px] font-black uppercase mr-3">Customer Revenue</p>
                 <p className="font-bold text-sm">₹{filteredBills.reduce((s, b) => s + b.totalAmount, 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-orange-50 text-orange-700 px-4 py-2.5 rounded-xl border border-orange-100 flex items-center">
+                <p className="text-[10px] font-black uppercase mr-3">Total GST</p>
+                <p className="font-bold text-sm">₹{filteredBills.reduce((s, b) => s + b.taxAmount, 0).toFixed(2)}</p>
               </div>
               <div className="flex items-center space-x-4 bg-white p-2 border border-slate-100 rounded-xl shadow-sm">
                 <div className="flex items-center space-x-2">
@@ -250,6 +268,7 @@ export default function DashboardPanel() {
                     <th className="px-6 py-4">Invoice #</th>
                     <th className="px-6 py-4">Billing Date</th>
                     <th className="px-6 py-4">Vendor Name</th>
+                    <th className="px-6 py-4 text-right">GST</th>
                     <th className="px-6 py-4 text-right">Amount</th>
                     <th className="px-6 py-4 text-right">Action</th>
                   </tr>
@@ -274,6 +293,7 @@ export default function DashboardPanel() {
                           </td>
                           <td className="px-6 py-4 text-slate-500 text-sm">{bill.invoiceDate || new Date(bill.date).toLocaleDateString()}</td>
                           <td className="px-6 py-4 text-slate-600 font-medium text-sm">{bill.vendorName}</td>
+                          <td className="px-6 py-4 text-right font-bold text-orange-600">₹{(bill.taxAmount || 0).toFixed(2)}</td>
                           <td className="px-6 py-4 text-right font-black text-slate-800">₹{bill.totalAmount.toFixed(2)}</td>
 
                           <td className="px-6 py-4 text-right">
