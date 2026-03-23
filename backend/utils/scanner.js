@@ -1,12 +1,12 @@
-const { Mistral } = require('@mistralai/mistralai');
+const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 
 exports.extractInvoiceDetails = async (filePath, mimetype) => {
-  if (!process.env.MISTRAL_API_KEY || process.env.MISTRAL_API_KEY === 'YOUR_MISTRAL_API_KEY_HERE') {
-    throw new Error("MISTRAL_API_KEY is missing or invalid in backend/.env file.");
+  if (!process.env.CLAUDE_API_KEY || process.env.CLAUDE_API_KEY === 'YOUR_CLAUDE_API_KEY_HERE') {
+    throw new Error("CLAUDE_API_KEY is missing or invalid in backend/.env file.");
   }
 
-  const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+  const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
   
   const prompt = `You are a strict, professional CA invoice data extractor. Read the provided invoice data perfectly.
 
@@ -28,55 +28,50 @@ Return a JSON object with EXACTLY these keys:
 
 Return ONLY pure raw JSON code without markdown backticks.`;
 
-  let fileId = null;
   try {
-    console.log(`📤 Uploading file to Mistral (${mimetype})...`);
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Data = fileBuffer.toString('base64');
     
-    // 1. Upload file to Mistral
-    const uploadResponse = await client.files.upload({
-      file: fs.createReadStream(filePath),
-      purpose: "ocr"
-    });
-    fileId = uploadResponse.id;
-
-    console.log(`🌀 Running Mistral OCR on fileId: ${fileId}...`);
-    
-    // 2. Process with Mistral OCR using the fileId
-    const ocrResponse = await client.ocr.process({
-      model: "mistral-ocr-latest",
-      document: {
-        type: "file",
-        fileId: fileId
-      }
-    });
-
-    // Combine text from all pages
-    const extractedText = ocrResponse.pages.map(page => page.markdown).join('\n\n');
-
-    if (!extractedText.trim()) {
-      throw new Error("Mistral OCR failed to extract any text from the document.");
+    let contentBlock;
+    if (mimetype === 'application/pdf') {
+      contentBlock = {
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: base64Data,
+        },
+      };
+    } else {
+      contentBlock = {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: mimetype,
+          data: base64Data,
+        },
+      };
     }
 
-    console.log(`🧠 Processing extracted text with Mistral LLM...`);
+    console.log(`🔍 Extracting data with Claude 3.5 Sonnet [${mimetype}]...`);
 
-    // 3. Structured Extraction with Mistral Large
-    const chatResponse = await client.chat.complete({
-      model: "mistral-large-latest",
+    const message = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 4096,
       messages: [
-        { role: "system", content: "You are a specialized invoice parser. Return ONLY JSON." },
-        { role: "user", content: `${prompt}\n\nInvoice OCR Content:\n${extractedText}` }
+        {
+          role: "user",
+          content: [
+            contentBlock,
+            { type: "text", text: prompt }
+          ],
+        }
       ],
-      responseFormat: { type: "json_object" }
+      // PDF support often requires this beta header in some SDK versions
+      headers: mimetype === 'application/pdf' ? { "anthropic-beta": "pdfs-2024-09-25" } : {}
     });
 
-    // Cleanup: Delete the file from Mistral after processing
-    try {
-      await client.files.delete({ fileId });
-    } catch (cleanupErr) {
-      console.warn("Mistral file cleanup failed:", cleanupErr.message);
-    }
-
-    const responseText = chatResponse.choices[0].message.content;
+    const responseText = message.content[0].text;
     const parsedData = JSON.parse(responseText);
     
     // Safety Fallbacks
@@ -100,11 +95,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     return parsedData;
 
   } catch (error) {
-    if (fileId) {
-      try { await client.files.delete({ fileId }); } catch(err) {}
-    }
-    console.error("Mistral AI Full Error:", error);
-    const detail = error.response ? JSON.stringify(error.response.data) : error.message;
-    throw new Error(`Mistral Extraction Failed: ${detail}. Check your API key and file format.`);
+    console.error("Claude AI Error:", error.message || error);
+    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Claude API Key is valid and the file is clear.`);
   }
 };
