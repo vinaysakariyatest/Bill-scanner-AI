@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export default function DashboardPanel() {
   const [data, setData] = useState([]);

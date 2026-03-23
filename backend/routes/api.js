@@ -7,7 +7,7 @@ const dashboardController = require('../controllers/dashboardController');
 const authController = require('../controllers/authController');
 
 // Set up multer for file uploads
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: '/tmp/' });
 
 // API Routes
 router.post('/upload', upload.single('invoice'), billController.uploadInvoice);
