@@ -1,13 +1,12 @@
-const Groq = require('groq-sdk');
+const { Mistral } = require('mistralai');
 const fs = require('fs');
-const pdf = require('pdf-parse');
 
 exports.extractInvoiceDetails = async (filePath, mimetype) => {
-  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'YOUR_GROQ_API_KEY_HERE') {
-    throw new Error("GROQ_API_KEY is missing or invalid in backend/.env file.");
+  if (!process.env.MISTRAL_API_KEY || process.env.MISTRAL_API_KEY === 'YOUR_MISTRAL_API_KEY_HERE') {
+    throw new Error("MISTRAL_API_KEY is missing or invalid in backend/.env file.");
   }
 
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
   
   const prompt = `You are a strict, professional CA invoice data extractor. Read the provided invoice data perfectly.
 
@@ -30,54 +29,44 @@ Return a JSON object with EXACTLY these keys:
 Return ONLY pure raw JSON code without markdown backticks.`;
 
   try {
-    let responseText = "";
-    const fileBytes = fs.readFileSync(filePath);
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Data = fileBuffer.toString('base64');
 
-    if (mimetype === 'application/pdf') {
-      // PDF Processing: Extract text then use Groq
-      const data = await pdf(fileBytes);
-      const extractedText = data.text.trim();
-
-      if (!extractedText) {
-        throw new Error("Could not extract text from PDF. It might be a scanned image-only PDF.");
+    console.log(`🌀 Running Mistral OCR on ${mimetype}...`);
+    
+    // 1. Process with Mistral OCR
+    const ocrResponse = await client.ocr.process({
+      model: "mistral-ocr-latest",
+      document: {
+        type: "content",
+        filename: "document",
+        content: base64Data
       }
+    });
 
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: "You are a specialized invoice parser. Return ONLY JSON." },
-          { role: "user", content: `${prompt}\n\nInvoice Text Content:\n${extractedText}` }
-        ],
-        model: "llama-3.1-8b-instant",
-        response_format: { type: "json_object" }
-      });
-      responseText = chatCompletion.choices[0].message.content;
-    } else {
-      // Image Processing: Use Groq Vision
-      const base64Image = fileBytes.toString('base64');
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimetype};base64,${base64Image}`,
-                },
-              },
-            ],
-          },
-        ],
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
-        response_format: { type: "json_object" }
-      });
-      responseText = chatCompletion.choices[0].message.content;
+    // Combine text from all pages
+    const extractedText = ocrResponse.pages.map(page => page.markdown).join('\n\n');
+
+    if (!extractedText.trim()) {
+      throw new Error("Mistral OCR failed to extract any text from the document.");
     }
 
+    console.log(`🧠 Processing extracted text with Mistral LLM...`);
+
+    // 2. Structured Extraction with Mistral Large
+    const chatResponse = await client.chat.complete({
+      model: "mistral-large-latest",
+      messages: [
+        { role: "system", content: "You are a specialized invoice parser. Return ONLY JSON." },
+        { role: "user", content: `${prompt}\n\nInvoice OCR Content:\n${extractedText}` }
+      ],
+      responseFormat: { type: "json_object" }
+    });
+
+    const responseText = chatResponse.choices[0].message.content;
     const parsedData = JSON.parse(responseText);
     
-    // Safety Fallbacks (Consistent with previous logic)
+    // Safety Fallbacks
     if (!parsedData.items) parsedData.items = [];
     if (!parsedData.subTotal) parsedData.subTotal = 0;
     if (!parsedData.taxAmount) parsedData.taxAmount = 0;
@@ -98,7 +87,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     return parsedData;
 
   } catch (error) {
-    console.error("AI Extraction Error:", error.message || error);
-    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Groq API Key is valid and the file is clear.`);
+    console.error("Mistral AI Error:", error.message || error);
+    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Mistral API Key is valid and the file is supported.`);
   }
 };
