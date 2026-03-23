@@ -17,6 +17,7 @@ export default function DashboardPanel() {
   const [activeCustomer, setActiveCustomer] = useState(null);
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [expandedInvoice, setExpandedInvoice] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchDashboard();
@@ -114,6 +115,15 @@ export default function DashboardPanel() {
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
+                <div className="relative ml-4">
+                  <input 
+                    type="text"
+                    placeholder="Search Customer..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="bg-slate-100 border-none rounded-lg px-4 py-1.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 w-64"
+                  />
+                </div>
               </div>
             </div>
             <div className="mt-6 md:mt-0 flex space-x-4">
@@ -173,7 +183,7 @@ export default function DashboardPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((customer) => (
+                  {data.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())).map((customer) => (
                     <tr key={customer._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
                       <td className="px-6 py-5">
                         <div className="flex items-center">
