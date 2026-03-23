@@ -28,19 +28,25 @@ Return a JSON object with EXACTLY these keys:
 
 Return ONLY pure raw JSON code without markdown backticks.`;
 
+  let fileId = null;
   try {
-    const fileBuffer = fs.readFileSync(filePath);
-    const base64Data = fileBuffer.toString('base64');
-
-    console.log(`🌀 Running Mistral OCR on ${mimetype}...`);
+    console.log(`📤 Uploading file to Mistral (${mimetype})...`);
     
-    // 1. Process with Mistral OCR
+    // 1. Upload file to Mistral
+    const uploadResponse = await client.files.upload({
+      file: fs.createReadStream(filePath),
+      purpose: "ocr"
+    });
+    fileId = uploadResponse.id;
+
+    console.log(`🌀 Running Mistral OCR on fileId: ${fileId}...`);
+    
+    // 2. Process with Mistral OCR using the fileId
     const ocrResponse = await client.ocr.process({
       model: "mistral-ocr-latest",
       document: {
-        type: "content",
-        filename: "document",
-        content: base64Data
+        type: "file",
+        fileId: fileId
       }
     });
 
@@ -53,7 +59,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
 
     console.log(`🧠 Processing extracted text with Mistral LLM...`);
 
-    // 2. Structured Extraction with Mistral Large
+    // 3. Structured Extraction with Mistral Large
     const chatResponse = await client.chat.complete({
       model: "mistral-large-latest",
       messages: [
@@ -62,6 +68,13 @@ Return ONLY pure raw JSON code without markdown backticks.`;
       ],
       responseFormat: { type: "json_object" }
     });
+
+    // Cleanup: Delete the file from Mistral after processing
+    try {
+      await client.files.delete({ fileId });
+    } catch (cleanupErr) {
+      console.warn("Mistral file cleanup failed:", cleanupErr.message);
+    }
 
     const responseText = chatResponse.choices[0].message.content;
     const parsedData = JSON.parse(responseText);
@@ -87,6 +100,9 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     return parsedData;
 
   } catch (error) {
+    if (fileId) {
+      try { await client.files.delete({ fileId }); } catch(err) {}
+    }
     console.error("Mistral AI Error:", error.message || error);
     throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Mistral API Key is valid and the file is supported.`);
   }
