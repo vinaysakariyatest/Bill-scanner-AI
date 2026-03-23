@@ -47,7 +47,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
           { role: "system", content: "You are a specialized invoice parser. Return ONLY JSON." },
           { role: "user", content: `${prompt}\n\nInvoice Text Content:\n${extractedText}` }
         ],
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.1-8b-instant",
         response_format: { type: "json_object" }
       });
       responseText = chatCompletion.choices[0].message.content;
