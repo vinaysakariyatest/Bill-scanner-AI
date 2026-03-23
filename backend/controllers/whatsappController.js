@@ -56,9 +56,18 @@ exports.handleWebhook = async (req, res) => {
     // 4. Handle Media (Bills/Invoices)
     if (payload.content?.contentType === "media" && payload.content?.media?.url) {
       const mediaUrl = payload.content.media.url;
-      const mimeType = payload.content.media.mimeType || 'image/jpeg'; // Fallback
+      let mimeType = payload.content.media.mimeType;
       
-      // Determine extension
+      console.log(`DEBUG: Received media with type: ${payload.content.contentType}, reported mimeType: ${mimeType}`);
+
+      // Smarter mimeType detection if missing
+      if (!mimeType) {
+        if (mediaUrl.toLowerCase().includes('.pdf')) mimeType = 'application/pdf';
+        else if (mediaUrl.toLowerCase().includes('.png')) mimeType = 'image/png';
+        else mimeType = 'image/jpeg';
+      }
+      
+      // Determine extension for local saving
       let ext = '.jpg';
       if (mimeType.includes('pdf')) ext = '.pdf';
       else if (mimeType.includes('png')) ext = '.png';
@@ -66,10 +75,10 @@ exports.handleWebhook = async (req, res) => {
       const tempFileName = `wa-${Date.now()}${ext}`;
       const tempPath = path.join('/tmp', tempFileName);
 
-      console.log(`📥 Downloading media: ${mediaUrl}`);
+      console.log(`📥 Downloading media [${mimeType}]: ${mediaUrl}`);
       await downloadFile(mediaUrl, tempPath);
 
-      console.log(`🔍 Extracting data using AI...`);
+      console.log(`🔍 Extracting data using AI (Model: gemini-1.5-flash)...`);
       const extractedData = await scanner.extractInvoiceDetails(tempPath, mimeType);
 
       // 5. Save to Bill & Customer

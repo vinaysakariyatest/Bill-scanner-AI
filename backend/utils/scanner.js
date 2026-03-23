@@ -37,8 +37,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
       }
     };
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+    const response = await ai.getGenerativeModel({ model: "gemini-1.5-flash" }).generateContent({
       contents: [
         {
           parts: [
