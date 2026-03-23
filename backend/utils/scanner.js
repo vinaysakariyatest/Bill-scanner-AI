@@ -38,8 +38,8 @@ Return ONLY pure raw JSON code without markdown backticks.`;
       }
     };
 
-    // Use gemini-1.5-flash for PDFs (confirmed stable) and user's preferred gemini-2.5-flash for images
-    const modelId = mimetype.includes('pdf') ? 'gemini-1.5-flash' : 'gemini-2.5-flash';
+    // Use gemini-2.0-flash which supports both images and PDFs reliably
+    const modelId = 'gemini-2.0-flash';
 
     const response = await ai.models.generateContent({
       model: modelId,
