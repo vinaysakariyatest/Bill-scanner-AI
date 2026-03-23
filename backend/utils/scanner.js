@@ -1,12 +1,16 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require('fs');
 
 exports.extractInvoiceDetails = async (filePath, mimetype) => {
-  if (!process.env.CLAUDE_API_KEY || process.env.CLAUDE_API_KEY === 'YOUR_CLAUDE_API_KEY_HERE') {
-    throw new Error("CLAUDE_API_KEY is missing or invalid in backend/.env file.");
+  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+    throw new Error("GEMINI_API_KEY is missing or invalid in backend/.env file.");
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash",
+    generationConfig: { responseMimeType: "application/json" }
+  });
   
   const prompt = `You are a strict, professional CA invoice data extractor. Read the provided invoice data perfectly.
 
@@ -24,54 +28,28 @@ Return a JSON object with EXACTLY these keys:
 - taxAmount (number, sum of all taxes like GST/IGST/VAT)
 - discountAmount (number, overall discount/deduction applied to subtotal, 0 if none. Always return as a positive number)
 - totalAmount (number, final amount including tax and minus discount)
-- items (array of objects with: productName, hsnCode, qty, price, amount - DO NOT include overall discount as an item)
-
-Return ONLY pure raw JSON code without markdown backticks.`;
+- items (array of objects with: productName, hsnCode, qty, price, amount - DO NOT include overall discount as an item)`;
 
   try {
     const fileBuffer = fs.readFileSync(filePath);
     const base64Data = fileBuffer.toString('base64');
     
-    let contentBlock;
-    if (mimetype === 'application/pdf') {
-      contentBlock = {
-        type: "document",
-        source: {
-          type: "base64",
-          media_type: "application/pdf",
-          data: base64Data,
-        },
-      };
-    } else {
-      contentBlock = {
-        type: "image",
-        source: {
-          type: "base64",
-          media_type: mimetype,
-          data: base64Data,
-        },
-      };
-    }
-
-    console.log(`🔍 Extracting data with Claude 3.5 Sonnet [${mimetype}]...`);
-
-    const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: [
-            contentBlock,
-            { type: "text", text: prompt }
-          ],
+    const parts = [
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: mimetype,
+          data: base64Data
         }
-      ],
-      // PDF support often requires this beta header in some SDK versions
-      headers: mimetype === 'application/pdf' ? { "anthropic-beta": "pdfs-2024-09-25" } : {}
-    });
+      }
+    ];
 
-    const responseText = message.content[0].text;
+    console.log(`🔍 Extracting data with Gemini 2.0 Flash [${mimetype}]...`);
+
+    const result = await model.generateContent(parts);
+    const response = await result.response;
+    const responseText = response.text();
+    
     const parsedData = JSON.parse(responseText);
     
     // Safety Fallbacks
@@ -95,7 +73,7 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     return parsedData;
 
   } catch (error) {
-    console.error("Claude AI Error:", error.message || error);
-    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Claude API Key is valid and the file is clear.`);
+    console.error("Gemini AI Error:", error.message || error);
+    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Gemini API Key is valid and the file is clear.`);
   }
 };
