@@ -6,7 +6,8 @@ exports.extractInvoiceDetails = async (filePath, mimetype) => {
     throw new Error("GEMINI_API_KEY is missing in backend/.env file. Get it for FREE at: https://aistudio.google.com/app/apikey");
   }
 
-  const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
+  // Initialize with the object syntax required by @google/genai
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   
   const prompt = `You are a strict, professional CA invoice data extractor. Read the attached invoice perfectly.
 
@@ -37,20 +38,25 @@ Return ONLY pure raw JSON code without markdown backticks.`;
       }
     };
 
-    // Use gemini-1.5-flash for PDFs (high reliability) and user's gemini-2.5-flash for images
+    // Use gemini-1.5-flash for PDFs (confirmed stable) and user's preferred gemini-2.5-flash for images
     const modelId = mimetype.includes('pdf') ? 'gemini-1.5-flash' : 'gemini-2.5-flash';
-    const model = ai.getGenerativeModel({ 
+
+    const response = await ai.models.generateContent({
       model: modelId,
-      generationConfig: { responseMimeType: "application/json" }
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            documentPart
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json"
+      }
     });
 
-    const result = await model.generateContent([
-      { text: prompt },
-      documentPart
-    ]);
-
-    const response = await result.response;
-    const parsedData = JSON.parse(response.text());
+    const parsedData = JSON.parse(response.text);
     
     // Safety Fallbacks
     if (!parsedData.items) parsedData.items = [];
