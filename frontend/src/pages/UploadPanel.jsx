@@ -17,6 +17,7 @@ export default function UploadPanel() {
     vendorName: '',
     vendorGstNumber: '',
     customerName: '',
+    customerMobileNumber: '',
     customerGstNumber: '',
     subTotal: '',
     taxAmount: '',
@@ -69,6 +70,7 @@ export default function UploadPanel() {
         vendorName: res.data.vendorName || '',
         vendorGstNumber: res.data.vendorGstNumber || '',
         customerName: res.data.customerName || '',
+        customerMobileNumber: res.data.customerMobileNumber || '',
         customerGstNumber: res.data.customerGstNumber || '',
         subTotal: res.data.subTotal || 0,
         taxAmount: res.data.taxAmount || 0,
@@ -213,6 +215,10 @@ export default function UploadPanel() {
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600">Customer (Billed To)</label>
                 <input type="text" name="customerName" value={formData.customerName} onChange={handleFormChange} required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm font-medium outline-none transition-all" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Customer Mobile</label>
+                <input type="text" name="customerMobileNumber" value={formData.customerMobileNumber} onChange={handleFormChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm font-medium outline-none transition-all" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600">Vendor GST Number</label>

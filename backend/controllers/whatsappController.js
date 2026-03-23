@@ -87,8 +87,12 @@ exports.handleWebhook = async (req, res) => {
       if (!customer) {
         customer = new Customer({
           name: extractedData.customerName,
-          contactInfo: payload.from // Store WhatsApp number as contact info
+          contactInfo: payload.from, // Store WhatsApp number as contact info
+          mobileNumber: extractedData.customerMobileNumber || ''
         });
+        await customer.save();
+      } else if (extractedData.customerMobileNumber && !customer.mobileNumber) {
+        customer.mobileNumber = extractedData.customerMobileNumber;
         await customer.save();
       }
 

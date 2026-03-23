@@ -183,14 +183,23 @@ export default function DashboardPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())).map((customer) => (
+                  {data.filter(c => 
+                    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    (c.mobileNumber && c.mobileNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (c.contactInfo && c.contactInfo.toLowerCase().includes(searchTerm.toLowerCase()))
+                  ).map((customer) => (
                     <tr key={customer._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
                       <td className="px-6 py-5">
                         <div className="flex items-center">
                           <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold mr-4">
                             {customer.name.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-bold text-slate-800">{customer.name}</span>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-800">{customer.name}</span>
+                            {(customer.mobileNumber || customer.contactInfo) && (
+                              <span className="text-xs font-semibold text-slate-400 mt-0.5">{customer.mobileNumber || customer.contactInfo}</span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-5 text-center">

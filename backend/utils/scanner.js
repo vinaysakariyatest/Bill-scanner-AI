@@ -23,6 +23,7 @@ Return a JSON object with EXACTLY these keys:
 - vendorName (string, name of the company issuing the bill)
 - vendorGstNumber (string)
 - customerName (string, whoever the bill is billed to)
+- customerMobileNumber (string, mobile or phone number of the customer, empty if not found)
 - customerGstNumber (string)
 - subTotal (number, total before tax)
 - taxAmount (number, sum of all taxes like GST/IGST/VAT)

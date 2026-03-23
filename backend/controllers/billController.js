@@ -26,7 +26,7 @@ exports.saveBill = async (req, res) => {
   try {
     const { 
       invoiceNumber, invoiceDate, vendorName, vendorGstNumber, 
-      customerName, customerGstNumber, subTotal, taxAmount, discountAmount, totalAmount, 
+      customerName, customerMobileNumber, customerGstNumber, subTotal, taxAmount, discountAmount, totalAmount, 
       items, contactInfo 
     } = req.body;
 
@@ -41,8 +41,12 @@ exports.saveBill = async (req, res) => {
     if (!customer) {
       customer = new Customer({
         name: customerName,
-        contactInfo: contactInfo || ''
+        contactInfo: contactInfo || '',
+        mobileNumber: customerMobileNumber || ''
       });
+      await customer.save();
+    } else if (customerMobileNumber && !customer.mobileNumber) {
+      customer.mobileNumber = customerMobileNumber;
       await customer.save();
     }
 
