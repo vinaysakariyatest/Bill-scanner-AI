@@ -103,7 +103,8 @@ Return ONLY pure raw JSON code without markdown backticks.`;
     if (fileId) {
       try { await client.files.delete({ fileId }); } catch(err) {}
     }
-    console.error("Mistral AI Error:", error.message || error);
-    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Mistral API Key is valid and the file is supported.`);
+    console.error("Mistral AI Full Error:", error);
+    const detail = error.response ? JSON.stringify(error.response.data) : error.message;
+    throw new Error(`Mistral Extraction Failed: ${detail}. Check your API key and file format.`);
   }
 };
