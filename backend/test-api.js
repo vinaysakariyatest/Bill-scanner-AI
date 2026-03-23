@@ -1,15 +1,19 @@
 require('dotenv').config();
-const { GoogleGenAI } = require('@google/genai');
+const Groq = require('groq-sdk');
 async function run() {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: "Hello",
+    if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'YOUR_GROQ_API_KEY_HERE') {
+      console.error("Please set GROQ_API_KEY in .env");
+      return;
+    }
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: 'Hello' }],
     });
-    console.log("Success:", response.text);
+    console.log("Success:", response.choices[0].message.content);
   } catch(e) {
-    console.error("Error from GenAI:", e.message);
+    console.error("Error from Groq:", e.message);
   }
 }
 run();

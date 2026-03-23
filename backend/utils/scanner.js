@@ -1,15 +1,15 @@
-const { GoogleGenAI } = require('@google/genai');
+const Groq = require('groq-sdk');
 const fs = require('fs');
+const pdf = require('pdf-parse');
 
 exports.extractInvoiceDetails = async (filePath, mimetype) => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is missing in backend/.env file. Get it for FREE at: https://aistudio.google.com/app/apikey");
+  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'YOUR_GROQ_API_KEY_HERE') {
+    throw new Error("GROQ_API_KEY is missing or invalid in backend/.env file.");
   }
 
-  // Initialize with the object syntax required by @google/genai
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   
-  const prompt = `You are a strict, professional CA invoice data extractor. Read the attached invoice perfectly.
+  const prompt = `You are a strict, professional CA invoice data extractor. Read the provided invoice data perfectly.
 
 CRITICAL RULE: NEVER guess or fabricate any names or numbers. If a field is missing, output "" or 0.
 Read the tables carefully. The Total Amount should logically match the Subtotal + Tax.
@@ -30,46 +30,63 @@ Return a JSON object with EXACTLY these keys:
 Return ONLY pure raw JSON code without markdown backticks.`;
 
   try {
+    let responseText = "";
     const fileBytes = fs.readFileSync(filePath);
-    const documentPart = {
-      inlineData: {
-        data: Buffer.from(fileBytes).toString("base64"),
-        mimeType: mimetype
+
+    if (mimetype === 'application/pdf') {
+      // PDF Processing: Extract text then use Groq
+      const data = await pdf(fileBytes);
+      const extractedText = data.text.trim();
+
+      if (!extractedText) {
+        throw new Error("Could not extract text from PDF. It might be a scanned image-only PDF.");
       }
-    };
 
-    // Use gemini-1.5-flash for PDFs (confirmed stable) and user's preferred gemini-2.5-flash for images
-    const modelId = mimetype.includes('pdf') ? 'gemini-1.5-flash' : 'gemini-2.5-flash';
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          { role: "system", content: "You are a specialized invoice parser. Return ONLY JSON." },
+          { role: "user", content: `${prompt}\n\nInvoice Text Content:\n${extractedText}` }
+        ],
+        model: "llama-3.3-70b-versatile",
+        response_format: { type: "json_object" }
+      });
+      responseText = chatCompletion.choices[0].message.content;
+    } else {
+      // Image Processing: Use Groq Vision
+      const base64Image = fileBytes.toString('base64');
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimetype};base64,${base64Image}`,
+                },
+              },
+            ],
+          },
+        ],
+        model: "llama-3.2-90b-vision-preview",
+        response_format: { type: "json_object" }
+      });
+      responseText = chatCompletion.choices[0].message.content;
+    }
 
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            documentPart
-          ]
-        }
-      ],
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-
-    const parsedData = JSON.parse(response.text);
+    const parsedData = JSON.parse(responseText);
     
-    // Safety Fallbacks
+    // Safety Fallbacks (Consistent with previous logic)
     if (!parsedData.items) parsedData.items = [];
     if (!parsedData.subTotal) parsedData.subTotal = 0;
     if (!parsedData.taxAmount) parsedData.taxAmount = 0;
     if (!parsedData.discountAmount) parsedData.discountAmount = 0;
     
-    // Ensure discount is always positive for logical subtraction
     parsedData.discountAmount = Math.abs(Number(parsedData.discountAmount) || 0);
 
     if (!parsedData.totalAmount) parsedData.totalAmount = 0;
     
-    // Manual fallback calculation on empty totals
     let calcAmount = parsedData.items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
     if (parsedData.subTotal === 0 && calcAmount > 0) parsedData.subTotal = calcAmount;
     if (parsedData.totalAmount === 0 && calcAmount > 0) parsedData.totalAmount = calcAmount + Number(parsedData.taxAmount) - Number(parsedData.discountAmount);
@@ -82,6 +99,6 @@ Return ONLY pure raw JSON code without markdown backticks.`;
 
   } catch (error) {
     console.error("AI Extraction Error:", error.message || error);
-    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Gemini API Key is valid and the image is clear.`);
+    throw new Error(`Failed to extract data. Details: ${error.message || 'Unknown error'}. Ensure your Groq API Key is valid and the file is clear.`);
   }
 };

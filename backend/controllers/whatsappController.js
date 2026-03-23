@@ -78,7 +78,7 @@ exports.handleWebhook = async (req, res) => {
       console.log(`📥 Downloading media [${mimeType}]: ${mediaUrl}`);
       await downloadFile(mediaUrl, tempPath);
 
-      console.log(`🔍 Extracting data using AI (Model: gemini-1.5-flash)...`);
+      console.log(`🔍 Extracting data using AI (Model: Groq (Llama-3.2/3.3))...`);
       const extractedData = await scanner.extractInvoiceDetails(tempPath, mimeType);
 
       // 5. Save to Bill & Customer
