@@ -1,4 +1,4 @@
-const { Mistral } = require('mistralai');
+const { Mistral } = require('@mistralai/mistralai');
 const fs = require('fs');
 
 exports.extractInvoiceDetails = async (filePath, mimetype) => {

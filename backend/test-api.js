@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Mistral } = require('mistralai');
+const { Mistral } = require('@mistralai/mistralai');
 async function run() {
   try {
     if (!process.env.MISTRAL_API_KEY || process.env.MISTRAL_API_KEY === 'YOUR_MISTRAL_API_KEY_HERE') {
