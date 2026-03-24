@@ -23,6 +23,7 @@ export default function UploadPanel() {
     taxAmount: '',
     discountAmount: '',
     totalAmount: '',
+    imageUrl: '',
     items: []
   });
 
@@ -76,6 +77,7 @@ export default function UploadPanel() {
         taxAmount: res.data.taxAmount || 0,
         discountAmount: res.data.discountAmount || 0,
         totalAmount: res.data.totalAmount || 0,
+        imageUrl: res.data.imageUrl || '',
         items: res.data.items || []
       });
     } catch (err) {

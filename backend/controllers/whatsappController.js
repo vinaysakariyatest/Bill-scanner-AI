@@ -74,7 +74,10 @@ exports.handleWebhook = async (req, res) => {
       else if (mimeType.includes('png')) ext = '.png';
 
       const tempFileName = `wa-${Date.now()}${ext}`;
-      const tempPath = path.join('/tmp', tempFileName);
+      const uploadsDir = path.join(__dirname, '../uploads');
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+      
+      const tempPath = path.join(uploadsDir, tempFileName);
 
       console.log(`📥 Downloading media [${mimeType}]: ${mediaUrl}`);
       await downloadFile(mediaUrl, tempPath);
@@ -130,6 +133,7 @@ exports.handleWebhook = async (req, res) => {
 
         const bill = new Bill({
           ...extractedData,
+          imageUrl: `/uploads/${tempFileName}`,
           ...(vendorIdToAssign && { vendorId: vendorIdToAssign }),
           customer: customer._id
         });
@@ -148,10 +152,7 @@ exports.handleWebhook = async (req, res) => {
         await newMessage.save();
       }
 
-      // Clean up temp file
-      if (fs.existsSync(tempPath)) {
-        fs.unlinkSync(tempPath);
-      }
+      // Image is now preserved for the dashboard view.
     }
 
     res.json({ success: true });

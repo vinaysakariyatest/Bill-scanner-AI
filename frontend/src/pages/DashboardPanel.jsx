@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit } from 'lucide-react';
+import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit, Eye, X } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -74,8 +74,12 @@ export default function DashboardPanel() {
   const [expandedRow, setExpandedRow] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [editingBillId, setEditingBillId] = useState(null);
-  const [editForm, setEditForm] = useState({});
   const [expandedInvoice, setExpandedInvoice] = useState(null);
+  const [viewImage, setViewImage] = useState(null);
+  const [editForm, setEditForm] = useState({ 
+    invoiceNumber: '', invoiceDate: '', vendorName: '', 
+    taxAmount: 0, totalAmount: 0, items: [] 
+  });
 
   // Re-fetch Stats when Date Global Filters change
   useEffect(() => {
@@ -932,6 +936,15 @@ export default function DashboardPanel() {
                                   </div>
                                 ) : (
                                   <div className="flex items-center justify-end space-x-1">
+                                    {bill.imageUrl && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setViewImage(bill.imageUrl); }}
+                                        className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                        title="View Invoice Document"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                    )}
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); handleEditClick(bill); }}
                                       className="p-2 text-slate-300 hover:text-primary-500 hover:bg-primary-50 rounded-xl transition-all"
@@ -1023,6 +1036,31 @@ export default function DashboardPanel() {
           )}
         </div>
       </div>
+
+      {/* Invoice Image Modal */}
+      {viewImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="relative max-w-4xl w-full max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] flex flex-col scale-100 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm">Source Document Viewer</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Digital Archive</p>
+                </div>
+              </div>
+              <button onClick={() => setViewImage(null)} className="p-2 bg-white hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-xl transition-colors shadow-sm">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-800/5 flex justify-center items-center p-4 min-h-[400px]">
+              <img src={`${API_BASE.replace('/api', '')}${viewImage}`} alt="Invoice Scan" className="max-w-full max-h-[75vh] object-contain rounded-xl ring-1 ring-slate-200/50 shadow-md" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

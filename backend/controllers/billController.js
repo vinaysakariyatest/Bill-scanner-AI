@@ -10,13 +10,12 @@ exports.uploadInvoice = async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { path, mimetype } = req.file;
-    const extractedDetails = await scanner.extractInvoiceDetails(path, mimetype);
+    const { path: tempPath, mimetype, filename } = req.file;
+    const extractedDetails = await scanner.extractInvoiceDetails(tempPath, mimetype);
 
-    // Clean up the uploaded file to save space (since we only needed OCR)
-    fs.unlinkSync(path);
-
-    res.json(extractedDetails);
+    const imageUrl = `/uploads/${filename}`;
+    
+    res.json({ ...extractedDetails, imageUrl });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to process file' });
@@ -28,7 +27,7 @@ exports.saveBill = async (req, res) => {
     const { 
       invoiceNumber, invoiceDate, vendorName, vendorGstNumber, 
       customerName, customerMobileNumber, customerGstNumber, subTotal, taxAmount, discountAmount, totalAmount, 
-      items, contactInfo 
+      items, contactInfo, imageUrl 
     } = req.body;
 
     // 1. Check for duplicate bill
@@ -88,7 +87,8 @@ exports.saveBill = async (req, res) => {
       subTotal,
       taxAmount,
       discountAmount,
-      totalAmount
+      totalAmount,
+      imageUrl
     });
     await bill.save();
 
