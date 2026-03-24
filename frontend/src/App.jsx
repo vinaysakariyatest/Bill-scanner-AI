@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { FileText, LayoutDashboard, LogOut } from 'lucide-react';
 import UploadPanel from './pages/UploadPanel';
 import DashboardPanel from './pages/DashboardPanel';
@@ -61,13 +62,16 @@ function ProtectedRoute({ children }) {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<PublicLayout><UploadPanel /></PublicLayout>} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPanel /></ProtectedRoute>} />
-      </Routes>
-    </Router>
+    <>
+      <Toaster position="top-right" toastOptions={{ className: 'font-sans font-bold text-sm shadow-xl rounded-2xl border border-slate-100' }} />
+      <Router>
+        <Routes>
+          <Route path="/" element={<PublicLayout><UploadPanel /></PublicLayout>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardPanel /></ProtectedRoute>} />
+        </Routes>
+      </Router>
+    </>
   );
 }
 

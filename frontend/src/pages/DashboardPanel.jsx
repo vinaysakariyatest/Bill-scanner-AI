@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -45,17 +46,28 @@ export default function DashboardPanel() {
   };
 
   const handleDeleteBill = async (billId) => {
-    if (!window.confirm("Are you sure you want to completely delete this invoice record? This cannot be undone.")) return;
-    
-    setDeletingId(billId);
-    try {
-      await axios.delete(`${API_BASE}/bills/${billId}`);
-      await fetchDashboard(); // Refresh UI silently
-    } catch (err) {
-      alert(err.response?.data?.error || "Failed to delete bill");
-    } finally {
-      setDeletingId(null);
-    }
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <p className="font-bold text-slate-800">Delete this invoice record?</p>
+        <p className="text-xs text-slate-500">This action cannot be undone.</p>
+        <div className="flex justify-end gap-2 mt-2">
+          <button onClick={() => toast.dismiss(t.id)} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button onClick={async () => {
+            toast.dismiss(t.id);
+            setDeletingId(billId);
+            try {
+              await axios.delete(`${API_BASE}/bills/${billId}`);
+              toast.success("Bill deleted entirely");
+              await fetchDashboard();
+            } catch (err) {
+              toast.error(err.response?.data?.error || "Failed to delete bill");
+            } finally {
+              setDeletingId(null);
+            }
+          }} className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white hover:bg-red-600 rounded-lg shadow-sm">Delete</button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   const pendingCustomers = data.filter(c => c.status === 'pending');
@@ -64,9 +76,10 @@ export default function DashboardPanel() {
   const handleConfirmCustomer = async (customerId) => {
     try {
       await axios.put(`${API_BASE}/customers/${customerId}/confirm`);
+      toast.success("Customer confirmed!");
       await fetchDashboard();
     } catch (err) {
-      alert(err.response?.data?.error || "Failed to confirm customer");
+      toast.error(err.response?.data?.error || "Failed to confirm customer");
     }
   };
 
@@ -275,15 +288,26 @@ export default function DashboardPanel() {
                                 </td>
                                 <td className="px-6 py-5 text-right flex items-center justify-end space-x-3">
                                   <button 
-                                    onClick={async () => {
-                                      if(window.confirm("Are you sure you want to completely reject/delete this pending customer? Their associated bills will also be deleted.")) {
-                                        try {
-                                          await axios.delete(`${API_BASE}/customers/${customer._id}`);
-                                          await fetchDashboard();
-                                        } catch (err) {
-                                          alert(err.response?.data?.error || "Failed to delete customer");
-                                        }
-                                      }
+                                    onClick={() => {
+                                      toast((t) => (
+                                        <div className="flex flex-col gap-3">
+                                          <p className="font-bold text-slate-800">Reject and delete customer?</p>
+                                          <p className="text-xs text-slate-500">Associated bills will also be permanently deleted.</p>
+                                          <div className="flex justify-end gap-2 mt-2">
+                                            <button onClick={() => toast.dismiss(t.id)} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
+                                            <button onClick={async () => {
+                                              toast.dismiss(t.id);
+                                              try {
+                                                await axios.delete(`${API_BASE}/customers/${customer._id}`);
+                                                toast.success("Customer and bills discarded");
+                                                await fetchDashboard();
+                                              } catch (err) {
+                                                toast.error(err.response?.data?.error || "Failed to delete customer");
+                                              }
+                                            }} className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white hover:bg-red-600 rounded-lg shadow-sm">Reject</button>
+                                          </div>
+                                        </div>
+                                      ), { duration: Infinity });
                                     }}
                                     className="p-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm active:scale-95"
                                     title="Delete Customer"
