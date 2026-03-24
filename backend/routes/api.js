@@ -22,6 +22,7 @@ router.get('/customers/:id/bills', dashboardController.getCustomerBills);
 router.put('/customers/:id/confirm', dashboardController.confirmCustomer);
 router.delete('/customers/:id', dashboardController.deleteCustomer);
 router.get('/vendors', vendorController.getVendorsPaginated);
+router.delete('/vendors/:id', vendorController.deleteVendor);
 router.post('/login', authController.login);
 router.post('/whatsapp-webhook', whatsappController.handleWebhook);
 

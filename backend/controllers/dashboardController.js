@@ -155,6 +155,27 @@ exports.confirmCustomer = async (req, res) => {
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    const Vendor = require('../models/Vendor');
+    const unlinkedBills = await Bill.find({ customer: id, vendorId: { $exists: false } });
+    
+    for (const bill of unlinkedBills) {
+      if (bill.vendorName) {
+        let vendorObj = await Vendor.findOne({ name: bill.vendorName });
+        if (!vendorObj) {
+          vendorObj = new Vendor({
+            name: bill.vendorName,
+            gstNumber: bill.vendorGstNumber || ''
+          });
+          await vendorObj.save();
+        } else if (bill.vendorGstNumber && !vendorObj.gstNumber) {
+          vendorObj.gstNumber = bill.vendorGstNumber;
+          await vendorObj.save();
+        }
+        bill.vendorId = vendorObj._id;
+        await bill.save();
+      }
+    }
     
     res.json({ message: 'Customer confirmed gracefully', customer });
   } catch (error) {

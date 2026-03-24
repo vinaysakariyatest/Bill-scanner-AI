@@ -60,3 +60,22 @@ exports.getVendorsPaginated = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch vendors' });
   }
 };
+
+exports.deleteVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedVendor = await Vendor.findByIdAndDelete(id);
+    
+    if (!deletedVendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+    
+    // Optionally remove vendorId from associated bills so they don't break
+    await Bill.updateMany({ vendorId: id }, { $unset: { vendorId: 1 } });
+    
+    res.json({ message: 'Vendor and associations deleted successfully' });
+  } catch (error) {
+    console.error("Delete Vendor Error:", error);
+    res.status(500).json({ error: 'Failed to delete vendor' });
+  }
+};

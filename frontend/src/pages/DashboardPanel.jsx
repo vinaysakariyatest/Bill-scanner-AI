@@ -7,21 +7,20 @@ import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, L
 const API_BASE = '/api';
 
 const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
-  if (totalPages <= 1) return null;
   return (
     <div className="flex justify-center items-center space-x-4 p-4 bg-white/50 border-t border-slate-100 mt-2 rounded-b-3xl">
       <button 
-        disabled={currentPage === 1} 
+        disabled={currentPage <= 1} 
         onClick={() => onPageChange(currentPage - 1)}
         className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-200 transition-colors shadow-sm text-sm"
       >
         Previous
       </button>
       <span className="text-xs font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
-        Page {currentPage} of {totalPages}
+        Page {currentPage} of {Math.max(1, totalPages)}
       </span>
       <button 
-        disabled={currentPage === totalPages} 
+        disabled={currentPage >= totalPages || totalPages === 0} 
         onClick={() => onPageChange(currentPage + 1)}
         className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-200 transition-colors shadow-sm text-sm"
       >
@@ -181,6 +180,31 @@ export default function DashboardPanel() {
     } finally {
       setBillLoading(false);
     }
+  };
+
+  const handleDeleteVendor = async (vendorId) => {
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <p className="font-bold text-slate-800">Delete this vendor?</p>
+        <p className="text-xs text-slate-500">Associated bills will be unlinked but not deleted.</p>
+        <div className="flex justify-end gap-2 mt-2">
+          <button onClick={() => toast.dismiss(t.id)} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
+          <button onClick={async () => {
+            toast.dismiss(t.id);
+            setDeletingId(vendorId);
+            try {
+              await axios.delete(`${API_BASE}/vendors/${vendorId}`);
+              toast.success("Vendor deleted gracefully");
+              await fetchVendors();
+            } catch (err) {
+              toast.error(err.response?.data?.error || "Failed to delete vendor");
+            } finally {
+              setDeletingId(null);
+            }
+          }} className="px-3 py-1.5 text-xs font-bold bg-red-500 text-white hover:bg-red-600 rounded-lg shadow-sm">Delete</button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   const handleDeleteBill = async (billId) => {
@@ -721,6 +745,7 @@ export default function DashboardPanel() {
                               <th className="px-6 py-4 text-center">Invoices Logged</th>
                               <th className="px-6 py-4">Total Payables</th>
                               <th className="px-6 py-4">Tax Component</th>
+                              <th className="px-6 py-4 text-right rounded-tr-3xl">Action</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -747,6 +772,16 @@ export default function DashboardPanel() {
                                 </td>
                                 <td className="px-6 py-5">
                                   <span className="font-bold text-orange-600">₹{(vendor.totalTax || 0).toFixed(2)}</span>
+                                </td>
+                                <td className="px-6 py-5 text-right">
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteVendor(vendor._id); }}
+                                    disabled={deletingId === vendor._id}
+                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                    title="Delete Vendor"
+                                  >
+                                    {deletingId === vendor._id ? <Loader2 className="w-4 h-4 animate-spin text-red-500" /> : <Trash2 className="w-4 h-4" />}
+                                  </button>
                                 </td>
                               </tr>
                             ))}

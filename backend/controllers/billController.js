@@ -58,17 +58,21 @@ exports.saveBill = async (req, res) => {
     }
 
     // 2.5 Find or create Vendor
-    const Vendor = require('../models/Vendor');
-    let vendor = await Vendor.findOne({ name: vendorName });
-    if (!vendor) {
-      vendor = new Vendor({
-        name: vendorName,
-        gstNumber: vendorGstNumber || ''
-      });
-      await vendor.save();
-    } else if (vendorGstNumber && !vendor.gstNumber) {
-      vendor.gstNumber = vendorGstNumber;
-      await vendor.save();
+    let vendorId = undefined;
+    if (customer.status !== 'pending') {
+      const Vendor = require('../models/Vendor');
+      let vendor = await Vendor.findOne({ name: vendorName });
+      if (!vendor) {
+        vendor = new Vendor({
+          name: vendorName,
+          gstNumber: vendorGstNumber || ''
+        });
+        await vendor.save();
+      } else if (vendorGstNumber && !vendor.gstNumber) {
+        vendor.gstNumber = vendorGstNumber;
+        await vendor.save();
+      }
+      vendorId = vendor._id;
     }
 
     // 3. Create bill
@@ -77,7 +81,7 @@ exports.saveBill = async (req, res) => {
       invoiceDate,
       vendorName,
       vendorGstNumber,
-      vendorId: vendor._id,
+      ...(vendorId && { vendorId }),
       customer: customer._id,
       customerGstNumber,
       items,
