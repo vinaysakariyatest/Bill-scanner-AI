@@ -8,13 +8,8 @@ const authController = require('../controllers/authController');
 const whatsappController = require('../controllers/whatsappController');
 const vendorController = require('../controllers/vendorController');
 
-const path = require('path');
-const fs = require('fs');
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
 // Set up multer for file uploads
-const upload = multer({ dest: uploadDir });
+const upload = multer({ dest: '/tmp/' });
 
 // API Routes
 router.post('/upload', upload.single('invoice'), billController.uploadInvoice);

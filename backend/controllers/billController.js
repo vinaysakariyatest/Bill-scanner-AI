@@ -13,9 +13,14 @@ exports.uploadInvoice = async (req, res) => {
     const { path: tempPath, mimetype, filename } = req.file;
     const extractedDetails = await scanner.extractInvoiceDetails(tempPath, mimetype);
 
-    const imageUrl = `/uploads/${filename}`;
+    // Convert file to base64 to bypass Vercel serverless storage constraints
+    const fileBuffer = fs.readFileSync(tempPath);
+    const base64Image = `data:${mimetype};base64,${fileBuffer.toString('base64')}`;
+
+    // Clean up temporary Vercel storage
+    fs.unlinkSync(tempPath);
     
-    res.json({ ...extractedDetails, imageUrl });
+    res.json({ ...extractedDetails, imageUrl: base64Image });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to process file' });

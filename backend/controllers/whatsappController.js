@@ -74,10 +74,7 @@ exports.handleWebhook = async (req, res) => {
       else if (mimeType.includes('png')) ext = '.png';
 
       const tempFileName = `wa-${Date.now()}${ext}`;
-      const uploadsDir = path.join(__dirname, '../uploads');
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-      
-      const tempPath = path.join(uploadsDir, tempFileName);
+      const tempPath = path.join('/tmp', tempFileName);
 
       console.log(`📥 Downloading media [${mimeType}]: ${mediaUrl}`);
       await downloadFile(mediaUrl, tempPath);
@@ -131,9 +128,13 @@ exports.handleWebhook = async (req, res) => {
           vendorIdToAssign = vendorObj._id;
         }
 
+        // Convert to Base64 for Serverless MongoDB storage
+        const fileBuffer = fs.readFileSync(tempPath);
+        const base64Image = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+
         const bill = new Bill({
           ...extractedData,
-          imageUrl: `/uploads/${tempFileName}`,
+          imageUrl: base64Image,
           ...(vendorIdToAssign && { vendorId: vendorIdToAssign }),
           customer: customer._id
         });
@@ -152,7 +153,10 @@ exports.handleWebhook = async (req, res) => {
         await newMessage.save();
       }
 
-      // Image is now preserved for the dashboard view.
+      // Clean up temp file
+      if (fs.existsSync(tempPath)) {
+        fs.unlinkSync(tempPath);
+      }
     }
 
     res.json({ success: true });

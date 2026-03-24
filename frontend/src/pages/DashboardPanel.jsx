@@ -1056,7 +1056,7 @@ export default function DashboardPanel() {
               </button>
             </div>
             <div className="flex-1 overflow-auto bg-slate-800/5 flex justify-center items-center p-4 min-h-[400px]">
-              <img src={`${API_BASE.replace('/api', '')}${viewImage}`} alt="Invoice Scan" className="max-w-full max-h-[75vh] object-contain rounded-xl ring-1 ring-slate-200/50 shadow-md" />
+              <img src={viewImage.startsWith('data:') ? viewImage : `${API_BASE.replace('/api', '')}${viewImage}`} alt="Invoice Scan" className="max-w-full max-h-[75vh] object-contain rounded-xl ring-1 ring-slate-200/50 shadow-md" />
             </div>
           </div>
         </div>
