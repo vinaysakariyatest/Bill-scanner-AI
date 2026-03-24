@@ -21,7 +21,6 @@ function AdminLayout({ children }) {
           <h1 className="text-xl font-bold text-slate-800">BillScanner <span className="text-primary-500 font-extrabold">Admin</span></h1>
         </div>
         <div className="flex items-center gap-4">
-          <Link to="/" className="text-sm font-semibold text-slate-500 hover:text-primary-600 px-4 py-2 transition-colors">Go to Upload App</Link>
           <button onClick={handleLogout} className="flex items-center bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-500 px-4 py-2 rounded-lg text-sm font-bold transition-all">
             <LogOut className="w-4 h-4 mr-2" />
             Logout

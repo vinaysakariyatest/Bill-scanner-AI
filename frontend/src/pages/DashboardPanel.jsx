@@ -75,7 +75,6 @@ export default function DashboardPanel() {
   const [deletingId, setDeletingId] = useState(null);
   const [editingBillId, setEditingBillId] = useState(null);
   const [expandedInvoice, setExpandedInvoice] = useState(null);
-  const [viewImage, setViewImage] = useState(null);
   const [editForm, setEditForm] = useState({ 
     invoiceNumber: '', invoiceDate: '', vendorName: '', 
     taxAmount: 0, totalAmount: 0, items: [] 
@@ -249,6 +248,36 @@ export default function DashboardPanel() {
       items: bill.items ? JSON.parse(JSON.stringify(bill.items)) : []
     });
     setExpandedInvoice(bill._id);
+  };
+
+  const handleViewDocument = (base64Data) => {
+    // Check if it's already a full base64 or relative (fallback)
+    const isBase64 = base64Data.startsWith('data:');
+    const sourcePath = isBase64 ? base64Data : `${API_BASE.replace('/api', '')}${base64Data}`;
+
+    if (isBase64) {
+      // Opening Base64 directly using pop-up document write bypasses strict Chrome 'Not allowed to navigate top frame to data URL' policies
+      const win = window.open();
+      if (win) {
+        win.document.title = "Invoice Document Viewer";
+        win.document.body.style.margin = '0';
+        win.document.body.style.backgroundColor = '#0f172a';
+        win.document.body.style.display = 'flex';
+        win.document.body.style.justifyContent = 'center';
+        win.document.body.style.alignItems = 'center';
+        win.document.body.style.height = '100vh';
+
+        if (base64Data.includes('application/pdf')) {
+          win.document.body.innerHTML = `<iframe src="${base64Data}" frameborder="0" style="width:100%; height:100vh;"></iframe>`;
+        } else {
+          win.document.body.innerHTML = `<img src="${base64Data}" style="max-width:100%; max-height:100vh; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.5);" />`;
+        }
+      } else {
+        toast.error("Popup blocked! Please allow popups for this site.");
+      }
+    } else {
+      window.open(sourcePath, '_blank');
+    }
   };
 
   const handleEditSave = async (billId) => {
@@ -938,9 +967,9 @@ export default function DashboardPanel() {
                                   <div className="flex items-center justify-end space-x-1">
                                     {bill.imageUrl && (
                                       <button 
-                                        onClick={(e) => { e.stopPropagation(); setViewImage(bill.imageUrl); }}
+                                        onClick={(e) => { e.stopPropagation(); handleViewDocument(bill.imageUrl); }}
                                         className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                                        title="View Invoice Document"
+                                        title="View Invoice Document in New Tab"
                                       >
                                         <Eye className="w-4 h-4" />
                                       </button>
@@ -1036,31 +1065,6 @@ export default function DashboardPanel() {
           )}
         </div>
       </div>
-
-      {/* Invoice Image Modal */}
-      {viewImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="relative max-w-4xl w-full max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] flex flex-col scale-100 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50 shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 text-sm">Source Document Viewer</h3>
-                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Digital Archive</p>
-                </div>
-              </div>
-              <button onClick={() => setViewImage(null)} className="p-2 bg-white hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-xl transition-colors shadow-sm">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto bg-slate-800/5 flex justify-center items-center p-4 min-h-[400px]">
-              <img src={viewImage.startsWith('data:') ? viewImage : `${API_BASE.replace('/api', '')}${viewImage}`} alt="Invoice Scan" className="max-w-full max-h-[75vh] object-contain rounded-xl ring-1 ring-slate-200/50 shadow-md" />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
