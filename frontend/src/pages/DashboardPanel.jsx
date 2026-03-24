@@ -256,24 +256,28 @@ export default function DashboardPanel() {
     const sourcePath = isBase64 ? base64Data : `${API_BASE.replace('/api', '')}${base64Data}`;
 
     if (isBase64) {
-      // Opening Base64 directly using pop-up document write bypasses strict Chrome 'Not allowed to navigate top frame to data URL' policies
-      const win = window.open();
-      if (win) {
-        win.document.title = "Invoice Document Viewer";
-        win.document.body.style.margin = '0';
-        win.document.body.style.backgroundColor = '#0f172a';
-        win.document.body.style.display = 'flex';
-        win.document.body.style.justifyContent = 'center';
-        win.document.body.style.alignItems = 'center';
-        win.document.body.style.height = '100vh';
-
-        if (base64Data.includes('application/pdf')) {
-          win.document.body.innerHTML = `<iframe src="${base64Data}" frameborder="0" style="width:100%; height:100vh;"></iframe>`;
-        } else {
-          win.document.body.innerHTML = `<img src="${base64Data}" style="max-width:100%; max-height:100vh; object-fit:contain; box-shadow: 0 0 20px rgba(0,0,0,0.5);" />`;
+      try {
+        // Convert Base64 string to a native Blob object
+        const parts = base64Data.split(';base64,');
+        const contentType = parts[0].split(':')[1];
+        const raw = window.atob(parts[1]);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        
+        for (let i = 0; i < rawLength; ++i) {
+          uInt8Array[i] = raw.charCodeAt(i);
         }
-      } else {
-        toast.error("Popup blocked! Please allow popups for this site.");
+        
+        const blob = new Blob([uInt8Array], { type: contentType });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Browsers handle blob URLs natively with full zoom & download capabilities
+        window.open(blobUrl, '_blank');
+        
+        // Note: URL.revokeObjectURL(blobUrl) isn't called immediately to allow the new tab time to load the resource.
+      } catch (err) {
+        console.error("Failed to parse Base64 to Blob:", err);
+        toast.error("Failed to open document securely.");
       }
     } else {
       window.open(sourcePath, '_blank');
