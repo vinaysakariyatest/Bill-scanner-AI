@@ -7,7 +7,6 @@ const dashboardController = require('../controllers/dashboardController');
 const authController = require('../controllers/authController');
 const whatsappController = require('../controllers/whatsappController');
 const vendorController = require('../controllers/vendorController');
-const aiController = require('../controllers/aiController');
 
 // Set up multer for file uploads
 const upload = multer({ dest: '/tmp/' });
@@ -24,7 +23,6 @@ router.put('/customers/:id/confirm', dashboardController.confirmCustomer);
 router.delete('/customers/:id', dashboardController.deleteCustomer);
 router.get('/vendors', vendorController.getVendorsPaginated);
 router.delete('/vendors/:id', vendorController.deleteVendor);
-router.post('/chat', aiController.askAssistant);
 router.post('/login', authController.login);
 router.post('/whatsapp-webhook', whatsappController.handleWebhook);
 

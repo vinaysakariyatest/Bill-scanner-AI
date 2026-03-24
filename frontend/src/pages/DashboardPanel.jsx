@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit, MessageSquare, Send, X, Bot } from 'lucide-react';
+import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -57,13 +57,6 @@ export default function DashboardPanel() {
   const [venTotalPages, setVenTotalPages] = useState(1);
   const [venLoading, setVenLoading] = useState(false);
 
-  // AI Assistant State
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([{ role: 'assistant', text: "Hi! I'm your AI accounting assistant. How can I help you regarding your revenue, customers, or vendors today?"}]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef(null);
-
   // Active Customer Bills Pagination
   const [activeCustomer, setActiveCustomer] = useState(null);
   const [bills, setBills] = useState([]);
@@ -88,13 +81,6 @@ export default function DashboardPanel() {
   useEffect(() => {
     fetchStats();
   }, [selectedMonth, selectedYear]);
-
-  // Scroll to bottom of chat
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages, isChatOpen]);
 
   // Re-fetch Customers when search or page changes
   const searchTimeout = useRef(null);
@@ -193,30 +179,6 @@ export default function DashboardPanel() {
       console.error(err);
     } finally {
       setBillLoading(false);
-    }
-  };
-
-  const handleSendChatMessage = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim() || chatLoading) return;
-    
-    const userMsg = { role: 'user', text: chatInput };
-    setChatMessages(prev => [...prev, userMsg]);
-    setChatInput('');
-    setChatLoading(true);
-
-    try {
-      const history = chatMessages.slice(1).map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.text }]
-      }));
-
-      const res = await axios.post(`${API_BASE}/chat`, { message: userMsg.text, history });
-      setChatMessages(prev => [...prev, { role: 'assistant', text: res.data.response }]);
-    } catch (err) {
-      setChatMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I encountered an error. Check if backend API Key and Internet are valid.' }]);
-    } finally {
-      setChatLoading(false);
     }
   };
 
@@ -1060,71 +1022,6 @@ export default function DashboardPanel() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* AI Chat Floating Action Button */}
-      <button
-        onClick={() => setIsChatOpen(true)}
-        className={`fixed bottom-8 right-8 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center shadow-2xl shadow-primary-600/40 transition-all z-40 ${isChatOpen ? 'scale-0' : 'scale-100'}`}
-      >
-        <MessageSquare className="w-6 h-6" />
-      </button>
-
-      {/* AI Chat Window */}
-      <div className={`fixed bottom-8 right-8 w-[380px] h-[550px] bg-white rounded-3xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.25)] border border-slate-100 flex flex-col overflow-hidden transition-all duration-300 z-50 origin-bottom-right ${isChatOpen ? 'scale-100 opacity-100' : 'scale-50 opacity-0 pointer-events-none'}`}>
-        <div className="bg-primary-600 p-4 flex justify-between items-center text-white shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-sm">BillScanner AI</p>
-              <p className="text-[10px] text-primary-200">Powered by Gemini 2.5 Flash Data MQL</p>
-            </div>
-          </div>
-          <button onClick={() => setIsChatOpen(false)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-white" />
-          </button>
-        </div>
-        
-        <div className="flex-1 bg-slate-50 p-4 overflow-y-auto flex flex-col space-y-4">
-          {chatMessages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] px-4 py-3 text-sm flex shadow-sm ${msg.role === 'user' ? 'bg-primary-600 text-white rounded-2xl rounded-br-sm' : 'bg-white border border-slate-100 text-slate-700 rounded-2xl rounded-bl-sm font-medium'}`}>
-                {msg.role === 'user' ? null : <Bot className="w-4 h-4 mr-2 shrink-0 mt-0.5 text-primary-500" />}
-                <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
-              </div>
-            </div>
-          ))}
-          {chatLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center space-x-2">
-                <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
-                <span className="text-xs text-slate-500 font-medium tracking-wide">Analyzing database...</span>
-              </div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        <form onSubmit={handleSendChatMessage} className="p-4 bg-white border-t border-slate-100 shrink-0">
-          <div className="relative flex items-center">
-            <input 
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask anything about your data..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-4 pr-12 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary-500/20 shadow-inner"
-            />
-            <button 
-              type="submit"
-              disabled={!chatInput.trim() || chatLoading}
-              className="absolute right-2 w-8 h-8 flex items-center justify-center bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 transform active:scale-95 text-white rounded-lg transition-all shadow-sm"
-            >
-              <Send className="w-4 h-4 -ml-0.5" />
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );
