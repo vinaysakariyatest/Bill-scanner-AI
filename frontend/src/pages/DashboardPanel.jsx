@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -10,6 +11,8 @@ export default function DashboardPanel() {
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [editingBillId, setEditingBillId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   // New states for filtering & navigation
   const [selectedMonth, setSelectedMonth] = useState('all');
@@ -70,6 +73,32 @@ export default function DashboardPanel() {
     ), { duration: Infinity });
   };
 
+  const handleEditClick = (bill) => {
+    setEditingBillId(bill._id);
+    setEditForm({
+      invoiceNumber: bill.invoiceNumber,
+      invoiceDate: bill.invoiceDate || new Date(bill.date).toISOString().split('T')[0],
+      vendorName: bill.vendorName,
+      taxAmount: bill.taxAmount || 0,
+      totalAmount: bill.totalAmount || 0,
+    });
+  };
+
+  const handleEditSave = async (billId) => {
+    try {
+      await axios.put(`${API_BASE}/bills/${billId}`, {
+        ...editForm,
+        taxAmount: Number(editForm.taxAmount),
+        totalAmount: Number(editForm.totalAmount)
+      });
+      toast.success("Bill updated successfully!");
+      setEditingBillId(null);
+      await fetchDashboard();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update bill");
+    }
+  };
+
   const pendingCustomers = data.filter(c => c.status === 'pending');
   const confirmedCustomers = data.filter(c => c.status !== 'pending');
 
@@ -111,6 +140,63 @@ export default function DashboardPanel() {
   const handleViewCustomerDetail = (customer) => {
     setActiveCustomer(customer);
     setViewMode('detail');
+  };
+
+  const handleExportCustomers = () => {
+    try {
+      const exportData = confirmedCustomers.map(c => ({
+        'Customer Name': c.name,
+        'Mobile Number': c.mobileNumber || '-',
+        'Contact Info': c.contactInfo || '-',
+        'Total Bills': c.totalBills,
+        'Total Spends (₹)': c.totalSpent?.toFixed(2) || '0.00',
+        'Total GST (₹)': c.totalTax?.toFixed(2) || '0.00'
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+      
+      const fileName = `Customers_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      toast.success("Excel file successfully generated!");
+    } catch (err) {
+      toast.error("Failed to generate export");
+      console.error(err);
+    }
+  };
+
+  const handleExportBills = () => {
+    if (!activeCustomer || filteredBills.length === 0) {
+      toast.error("No bills available to export");
+      return;
+    }
+    
+    try {
+      const exportData = filteredBills.map(b => ({
+        'Bill ID': b._id,
+        'Invoice Number': b.invoiceNumber,
+        'Vendor Name': b.vendorName,
+        'Vendor GST': b.vendorGstNumber || '-',
+        'Customer GST': b.customerGstNumber || '-',
+        'Date': b.invoiceDate || new Date(b.date).toLocaleDateString(),
+        'Subtotal (₹)': b.subTotal?.toFixed(2) || '0.00',
+        'Discount (₹)': b.discountAmount?.toFixed(2) || '0.00',
+        'GST Amount (₹)': b.taxAmount?.toFixed(2) || '0.00',
+        'Total Amount (₹)': b.totalAmount?.toFixed(2) || '0.00'
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `${activeCustomer.name} Bills`);
+      
+      const fileName = `Bills_${activeCustomer.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      toast.success("Excel export successful!");
+    } catch (err) {
+      toast.error("Failed to generate export");
+      console.error(err);
+    }
   };
 
   return (
@@ -337,13 +423,19 @@ export default function DashboardPanel() {
                       <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Customer Directory</h2>
                       <p className="text-sm text-slate-500 mt-1">Manage and view histories of all confirmed customers.</p>
                     </div>
-                    <div className="mt-6 md:mt-0 relative">
+                    <div className="mt-6 md:mt-0 flex flex-col md:flex-row items-center gap-3">
+                      <button 
+                        onClick={handleExportCustomers}
+                        className="bg-green-50 hover:bg-green-100 text-green-700 font-bold px-4 py-2.5 rounded-xl border border-green-200 transition-colors flex items-center shadow-sm w-full md:w-auto justify-center"
+                      >
+                        <FileText className="w-4 h-4 mr-2" /> Export to Excel
+                      </button>
                       <input 
                         type="text"
                         placeholder="Search Customers..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 w-full md:w-80 shadow-sm"
+                        className="bg-white border border-slate-200 rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 w-full md:w-64 lg:w-80 shadow-sm"
                       />
                     </div>
                   </div>
@@ -430,6 +522,12 @@ export default function DashboardPanel() {
                   Back to Customer List
                 </button>
                 <div className="flex flex-col md:flex-row items-center gap-4">
+                  <button 
+                    onClick={handleExportBills}
+                    className="bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2.5 rounded-xl border border-green-200 flex items-center shadow-sm font-bold transition-colors w-full md:w-auto justify-center mb-2 md:mb-0 md:mr-2"
+                  >
+                    <FileText className="w-4 h-4 mr-2" /> Export Bills (XLSX)
+                  </button>
                   <div className="bg-blue-50 text-primary-700 px-4 py-2.5 rounded-xl border border-primary-100 flex items-center">
                     <p className="text-[10px] font-black uppercase mr-3">Customer Revenue</p>
                     <p className="font-bold text-sm">₹{filteredBills.reduce((s, b) => s + b.totalAmount, 0).toFixed(2)}</p>
@@ -494,28 +592,73 @@ export default function DashboardPanel() {
                         filteredBills.map((bill) => (
                           <React.Fragment key={bill._id}>
                             <tr 
-                              onClick={() => setExpandedInvoice(expandedInvoice === bill._id ? null : bill._id)}
-                              className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                              onClick={() => editingBillId !== bill._id && setExpandedInvoice(expandedInvoice === bill._id ? null : bill._id)}
+                              className={`transition-colors cursor-pointer group ${editingBillId === bill._id ? 'bg-primary-50/40' : 'hover:bg-slate-50/50'}`}
                             >
                               <td className="px-6 py-4 font-bold text-slate-700">
-                                <div className="flex items-center">
-                                  {bill.invoiceNumber}
-                                  {expandedInvoice === bill._id ? <ChevronUp className="w-3 h-3 ml-2 text-slate-400" /> : <ChevronDown className="w-3 h-3 ml-2 text-slate-400" />}
-                                </div>
+                                {editingBillId === bill._id ? (
+                                  <input type="text" value={editForm.invoiceNumber} onChange={e => setEditForm({...editForm, invoiceNumber: e.target.value})} className="border border-primary-200 rounded px-2 py-1.5 w-full text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500/20 outline-none shadow-sm" />
+                                ) : (
+                                  <div className="flex items-center">
+                                    {bill.invoiceNumber}
+                                    {expandedInvoice === bill._id ? <ChevronUp className="w-3 h-3 ml-2 text-slate-400" /> : <ChevronDown className="w-3 h-3 ml-2 text-slate-400" />}
+                                  </div>
+                                )}
                               </td>
-                              <td className="px-6 py-4 text-slate-500 text-sm">{bill.invoiceDate || new Date(bill.date).toLocaleDateString()}</td>
-                              <td className="px-6 py-4 text-slate-600 font-medium text-sm">{bill.vendorName}</td>
-                              <td className="px-6 py-4 text-right font-bold text-orange-600">₹{(bill.taxAmount || 0).toFixed(2)}</td>
-                              <td className="px-6 py-4 text-right font-black text-slate-800">₹{bill.totalAmount.toFixed(2)}</td>
+                              <td className="px-6 py-4 text-slate-500 text-sm">
+                                {editingBillId === bill._id ? (
+                                  <input type="date" value={editForm.invoiceDate} onChange={e => setEditForm({...editForm, invoiceDate: e.target.value})} className="border border-primary-200 rounded px-2 py-1.5 w-full text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500/20 outline-none shadow-sm" />
+                                ) : (
+                                  bill.invoiceDate || new Date(bill.date).toLocaleDateString()
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-slate-600 font-medium text-sm">
+                                {editingBillId === bill._id ? (
+                                  <input type="text" value={editForm.vendorName} onChange={e => setEditForm({...editForm, vendorName: e.target.value})} className="border border-primary-200 rounded px-2 py-1.5 w-full text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500/20 outline-none shadow-sm" />
+                                ) : (
+                                  bill.vendorName
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-right font-bold text-orange-600">
+                                {editingBillId === bill._id ? (
+                                  <input type="number" step="0.01" value={editForm.taxAmount} onChange={e => setEditForm({...editForm, taxAmount: e.target.value})} className="border border-primary-200 rounded px-2 py-1.5 w-24 text-right text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500/20 outline-none shadow-sm" />
+                                ) : (
+                                  `₹${(bill.taxAmount || 0).toFixed(2)}`
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-right font-black text-slate-800">
+                                {editingBillId === bill._id ? (
+                                  <input type="number" step="0.01" value={editForm.totalAmount} onChange={e => setEditForm({...editForm, totalAmount: e.target.value})} className="border border-primary-200 rounded px-2 py-1.5 w-24 text-right text-sm font-bold bg-white focus:ring-2 focus:ring-primary-500/20 outline-none shadow-sm" />
+                                ) : (
+                                  `₹${bill.totalAmount.toFixed(2)}`
+                                )}
+                              </td>
 
                               <td className="px-6 py-4 text-right">
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); handleDeleteBill(bill._id); }}
-                                  disabled={deletingId === bill._id}
-                                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                >
-                                  {deletingId === bill._id ? <Loader2 className="w-4 h-4 animate-spin text-red-500" /> : <Trash2 className="w-4 h-4" />}
-                                </button>
+                                {editingBillId === bill._id ? (
+                                  <div className="flex justify-end space-x-2">
+                                    <button onClick={(e) => { e.stopPropagation(); setEditingBillId(null); }} className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-all shadow-sm">Cancel</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleEditSave(bill._id); }} className="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm">Save</button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-end space-x-1">
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleEditClick(bill); }}
+                                      className="p-2 text-slate-300 hover:text-primary-500 hover:bg-primary-50 rounded-xl transition-all"
+                                      title="Edit Bill"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteBill(bill._id); }}
+                                      disabled={deletingId === bill._id}
+                                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                      title="Delete Bill"
+                                    >
+                                      {deletingId === bill._id ? <Loader2 className="w-4 h-4 animate-spin text-red-500" /> : <Trash2 className="w-4 h-4" />}
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                             {expandedInvoice === bill._id && (

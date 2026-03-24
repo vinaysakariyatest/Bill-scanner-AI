@@ -93,3 +93,25 @@ exports.deleteBill = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete bill' });
   }
 };
+
+exports.updateBill = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updatedBill = await Bill.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedBill) {
+      return res.status(404).json({ error: 'Bill not found' });
+    }
+
+    res.json({ message: 'Bill updated successfully', bill: updatedBill });
+  } catch (error) {
+    console.error("Update Bill Error:", error);
+    res.status(500).json({ error: 'Failed to update bill', details: error.message });
+  }
+};

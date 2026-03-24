@@ -13,6 +13,7 @@ const upload = multer({ dest: '/tmp/' });
 // API Routes
 router.post('/upload', upload.single('invoice'), billController.uploadInvoice);
 router.post('/bills', billController.saveBill);
+router.put('/bills/:id', billController.updateBill);
 router.delete('/bills/:id', billController.deleteBill);
 router.get('/dashboard', dashboardController.getDashboardData);
 router.get('/customers/:id/bills', dashboardController.getCustomerBills);
