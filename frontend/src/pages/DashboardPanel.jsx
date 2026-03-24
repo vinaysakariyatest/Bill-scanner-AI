@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -6,59 +6,181 @@ import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, L
 
 const API_BASE = '/api';
 
+const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex justify-center items-center space-x-4 p-4 bg-white/50 border-t border-slate-100 mt-2 rounded-b-3xl">
+      <button 
+        disabled={currentPage === 1} 
+        onClick={() => onPageChange(currentPage - 1)}
+        className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-200 transition-colors shadow-sm text-sm"
+      >
+        Previous
+      </button>
+      <span className="text-xs font-black text-slate-400 uppercase tracking-widest bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+        Page {currentPage} of {totalPages}
+      </span>
+      <button 
+        disabled={currentPage === totalPages} 
+        onClick={() => onPageChange(currentPage + 1)}
+        className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-200 transition-colors shadow-sm text-sm"
+      >
+        Next
+      </button>
+    </div>
+  );
+};
+
 export default function DashboardPanel() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Global View States
+  const [viewMode, setViewMode] = useState('overview'); // 'overview' or 'detail'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'pending', 'customers'
+  
+  // Dashboard Stats
+  const [stats, setStats] = useState({ revenue: 0, tax: 0, billsCount: 0, pendingCount: 0, confirmedCount: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
+  
+  // Confirmed Customers Pagination
+  const [customers, setCustomers] = useState([]);
+  const [custPage, setCustPage] = useState(1);
+  const [custTotalPages, setCustTotalPages] = useState(1);
+  const [custLoading, setCustLoading] = useState(false);
+  
+  // Pending Customers Pagination
+  const [pending, setPending] = useState([]);
+  const [pendPage, setPendPage] = useState(1);
+  const [pendTotalPages, setPendTotalPages] = useState(1);
+  const [pendLoading, setPendLoading] = useState(false);
+
+  // Vendor Pagination
+  const [vendors, setVendors] = useState([]);
+  const [venPage, setVenPage] = useState(1);
+  const [venTotalPages, setVenTotalPages] = useState(1);
+  const [venLoading, setVenLoading] = useState(false);
+
+  // Active Customer Bills Pagination
+  const [activeCustomer, setActiveCustomer] = useState(null);
+  const [bills, setBills] = useState([]);
+  const [billPage, setBillPage] = useState(1);
+  const [billTotalPages, setBillTotalPages] = useState(1);
+  const [billLoading, setBillLoading] = useState(false);
+
+  // Filters
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedYear, setSelectedYear] = useState('all');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // UI Interactive States
   const [expandedRow, setExpandedRow] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [editingBillId, setEditingBillId] = useState(null);
   const [editForm, setEditForm] = useState({});
-
-  // New states for filtering & navigation
-  const [selectedMonth, setSelectedMonth] = useState('all');
-  const [selectedYear, setSelectedYear] = useState('all');
-  const [viewMode, setViewMode] = useState('overview'); // 'overview' or 'detail'
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'pending', 'customers'
-  
-  const [activeCustomer, setActiveCustomer] = useState(null);
-  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [expandedInvoice, setExpandedInvoice] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
 
+  // Re-fetch Stats when Date Global Filters change
   useEffect(() => {
-    fetchDashboard();
+    fetchStats();
   }, [selectedMonth, selectedYear]);
 
-  // Rehydrate the active customer after dashboard refetches perfectly to avoid UI collapse
+  // Re-fetch Customers when search or page changes
+  const searchTimeout = useRef(null);
   useEffect(() => {
-    if (activeCustomer && data.length > 0) {
-      const updatedCust = data.find(c => c._id === activeCustomer._id);
-      if (updatedCust) {
-        setActiveCustomer(updatedCust);
-      } else {
-        setViewMode('overview');
-        setActiveCustomer(null);
-      }
-    }
-  }, [data]);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      fetchCustomers();
+      fetchPending();
+      fetchVendors();
+    }, 500); // Debounce search
+    return () => clearTimeout(searchTimeout.current);
+  }, [searchTerm, custPage, pendPage, venPage]);
 
-  const fetchDashboard = async () => {
-    setLoading(true);
+  // Re-fetch bills if we are in detail view and filters/page change
+  useEffect(() => {
+    if (activeCustomer) {
+      fetchBills();
+    }
+  }, [activeCustomer?._id, billPage, dateFilter]);
+
+  const fetchStats = async () => {
+    setStatsLoading(true);
     try {
-      const res = await axios.get(`${API_BASE}/dashboard`, {
+      const res = await axios.get(`${API_BASE}/dashboard/stats`, {
         params: { month: selectedMonth, year: selectedYear }
       });
-      setData(res.data);
+      setStats(res.data);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      setStatsLoading(false);
     }
   };
 
-  const toggleRow = (id) => {
-    if (expandedRow === id) setExpandedRow(null);
-    else setExpandedRow(id);
+  const fetchCustomers = async () => {
+    setCustLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/customers`, {
+        params: { status: 'confirmed', page: custPage, limit: 10, search: searchTerm }
+      });
+      setCustomers(res.data.customers);
+      setCustTotalPages(res.data.totalPages);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCustLoading(false);
+    }
+  };
+
+  const fetchPending = async () => {
+    setPendLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/customers`, {
+        params: { status: 'pending', page: pendPage, limit: 10, search: searchTerm }
+      });
+      setPending(res.data.customers);
+      setPendTotalPages(res.data.totalPages);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPendLoading(false);
+    }
+  };
+
+  const fetchVendors = async () => {
+    setVenLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/vendors`, {
+        params: { page: venPage, limit: 10, search: searchTerm }
+      });
+      setVendors(res.data.vendors);
+      setVenTotalPages(res.data.totalPages);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setVenLoading(false);
+    }
+  };
+
+  const fetchBills = async () => {
+    if (!activeCustomer) return;
+    setBillLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/customers/${activeCustomer._id}/bills`, {
+        params: { page: billPage, limit: 15, startDate: dateFilter.start, endDate: dateFilter.end }
+      });
+      setBills(res.data.bills);
+      setBillTotalPages(res.data.totalPages);
+      
+      // Keep local customer copy synced with new db values to ensure header amounts match
+      const cRes = await axios.get(`${API_BASE}/customers`, { params: { search: activeCustomer.name, limit: 1 } });
+      if (cRes.data.customers.length > 0) {
+        setActiveCustomer(prev => ({ ...prev, ...cRes.data.customers[0] }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBillLoading(false);
+    }
   };
 
   const handleDeleteBill = async (billId) => {
@@ -74,7 +196,9 @@ export default function DashboardPanel() {
             try {
               await axios.delete(`${API_BASE}/bills/${billId}`);
               toast.success("Bill deleted entirely");
-              await fetchDashboard();
+              await fetchBills();
+              await fetchStats();
+              await fetchCustomers();
             } catch (err) {
               toast.error(err.response?.data?.error || "Failed to delete bill");
             } finally {
@@ -96,7 +220,7 @@ export default function DashboardPanel() {
       totalAmount: bill.totalAmount || 0,
       items: bill.items ? JSON.parse(JSON.stringify(bill.items)) : []
     });
-    setExpandedInvoice(bill._id); // Auto-expand to show items while editing
+    setExpandedInvoice(bill._id);
   };
 
   const handleEditSave = async (billId) => {
@@ -116,7 +240,9 @@ export default function DashboardPanel() {
       });
       toast.success("Bill updated successfully!");
       setEditingBillId(null);
-      await fetchDashboard();
+      await fetchBills();
+      await fetchStats();
+      await fetchCustomers();
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to update bill");
     }
@@ -137,42 +263,28 @@ export default function DashboardPanel() {
     setEditForm({ ...editForm, items: newItems });
   };
 
-  const pendingCustomers = data.filter(c => c.status === 'pending');
-  const confirmedCustomers = data.filter(c => c.status !== 'pending');
-
   const handleConfirmCustomer = async (customerId) => {
     try {
       await axios.put(`${API_BASE}/customers/${customerId}/confirm`);
       toast.success("Customer confirmed!");
-      await fetchDashboard();
+      await fetchPending();
+      await fetchCustomers();
+      await fetchStats();
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to confirm customer");
     }
   };
-
-  const totalRevenue = confirmedCustomers.reduce((sum, cust) => sum + (cust.totalSpent || 0), 0);
-  const totalTax = confirmedCustomers.reduce((sum, cust) => sum + (cust.totalTax || 0), 0);
-  const totalBills = confirmedCustomers.reduce((sum, cust) => sum + (cust.totalBills || 0), 0);
 
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
-  const filteredBills = activeCustomer?.bills?.filter(bill => {
-    if (!dateFilter.start && !dateFilter.end) return true;
-    
-    // Normalize bill date to YYYY-MM-DD for string comparison
-    const bDateStr = bill.invoiceDate || new Date(bill.date).toISOString().split('T')[0];
-    
-    if (dateFilter.start && bDateStr < dateFilter.start) return false;
-    if (dateFilter.end && bDateStr > dateFilter.end) return false;
-    return true;
-  }) || [];
-
   const handleBackToOverview = () => {
     setViewMode('overview');
     setActiveCustomer(null);
+    setBillPage(1);
+    setDateFilter({ start: '', end: '' });
   };
 
   const handleViewCustomerDetail = (customer) => {
@@ -180,9 +292,11 @@ export default function DashboardPanel() {
     setViewMode('detail');
   };
 
-  const handleExportCustomers = () => {
+  const handleExportCustomers = async () => {
     try {
-      const exportData = confirmedCustomers.map(c => ({
+      const toastId = toast.loading("Fetching all records for export...");
+      const res = await axios.get(`${API_BASE}/customers`, { params: { status: 'confirmed', limit: 100000 } });
+      const exportData = res.data.customers.map(c => ({
         'Customer Name': c.name,
         'Mobile Number': c.mobileNumber || '-',
         'Contact Info': c.contactInfo || '-',
@@ -197,6 +311,7 @@ export default function DashboardPanel() {
       
       const fileName = `Customers_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
+      toast.dismiss(toastId);
       toast.success("Excel file successfully generated!");
     } catch (err) {
       toast.error("Failed to generate export");
@@ -204,19 +319,24 @@ export default function DashboardPanel() {
     }
   };
 
-  const handleExportBills = () => {
-    if (!activeCustomer || filteredBills.length === 0) {
-      toast.error("No bills available to export");
-      return;
-    }
-    
+  const handleExportBills = async () => {
+    if (!activeCustomer) return;
     try {
-      const exportData = filteredBills.map(b => ({
+      const toastId = toast.loading("Compiling all bills for export...");
+      // Fetch all bills ignoring pagination for export
+      const res = await axios.get(`${API_BASE}/customers/${activeCustomer._id}/bills`, {
+        params: { limit: 100000, startDate: dateFilter.start, endDate: dateFilter.end }
+      });
+      const allBills = res.data.bills;
+      if (allBills.length === 0) {
+          toast.dismiss(toastId);
+          return toast.error("No bills available to export");
+      }
+
+      const exportData = allBills.map(b => ({
         'Bill ID': b._id,
         'Invoice Number': b.invoiceNumber,
         'Vendor Name': b.vendorName,
-        'Vendor GST': b.vendorGstNumber || '-',
-        'Customer GST': b.customerGstNumber || '-',
         'Date': b.invoiceDate || new Date(b.date).toLocaleDateString(),
         'Subtotal (₹)': b.subTotal?.toFixed(2) || '0.00',
         'Discount (₹)': b.discountAmount?.toFixed(2) || '0.00',
@@ -230,6 +350,7 @@ export default function DashboardPanel() {
       
       const fileName = `Bills_${activeCustomer.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
+      toast.dismiss(toastId);
       toast.success("Excel export successful!");
     } catch (err) {
       toast.error("Failed to generate export");
@@ -254,13 +375,19 @@ export default function DashboardPanel() {
             className={`w-full text-left px-4 py-3 rounded-xl flex items-center font-bold transition-all ${activeTab === 'pending' && viewMode === 'overview' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
           >
             <Clock className="w-5 h-5 mr-3" /> Pending
-            {pendingCustomers.length > 0 && <span className="ml-auto bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">{pendingCustomers.length}</span>}
+            {stats.pendingCount > 0 && <span className="ml-auto bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">{stats.pendingCount}</span>}
           </button>
           <button 
             onClick={() => { setActiveTab('customers'); setViewMode('overview'); }} 
             className={`w-full text-left px-4 py-3 rounded-xl flex items-center font-bold transition-all ${activeTab === 'customers' || viewMode === 'detail' ? 'bg-primary-50 text-primary-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
           >
             <Users className="w-5 h-5 mr-3" /> Customers
+          </button>
+          <button 
+            onClick={() => { setActiveTab('vendors'); setViewMode('overview'); }} 
+            className={`w-full text-left px-4 py-3 rounded-xl flex items-center font-bold transition-all ${activeTab === 'vendors' && viewMode === 'overview' ? 'bg-purple-50 text-purple-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+          >
+            <DollarSign className="w-5 h-5 mr-3" /> Vendors
           </button>
         </nav>
       </div>
@@ -308,7 +435,9 @@ export default function DashboardPanel() {
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedMonth === 'all' ? 'Overall Revenue' : 'Monthly Rev'}</p>
-                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">₹{totalRevenue.toFixed(0)}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">
+                          {statsLoading ? <Loader2 className="w-4 h-4 animate-spin my-1" /> : `₹${(stats.revenue || 0).toFixed(0)}`}
+                        </p>
                       </div>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
@@ -317,7 +446,9 @@ export default function DashboardPanel() {
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total GST</p>
-                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">₹{totalTax.toFixed(0)}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">
+                          {statsLoading ? <Loader2 className="w-4 h-4 animate-spin my-1" /> : `₹${(stats.tax || 0).toFixed(0)}`}
+                        </p>
                       </div>
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
@@ -326,7 +457,9 @@ export default function DashboardPanel() {
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bills Count</p>
-                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">{totalBills}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">
+                          {statsLoading ? <Loader2 className="w-4 h-4 animate-spin my-1" /> : (stats.billsCount || 0)}
+                        </p>
                       </div>
                     </div>
                     <div 
@@ -338,7 +471,9 @@ export default function DashboardPanel() {
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest group-hover:text-primary-600 transition-colors">Customers</p>
-                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight group-hover:text-primary-700 transition-colors">{confirmedCustomers.length}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight group-hover:text-primary-700 transition-colors">
+                          {statsLoading ? <Loader2 className="w-4 h-4 animate-spin my-1" /> : (stats.confirmedCount || 0)}
+                        </p>
                       </div>
                     </div>
                     <div 
@@ -346,22 +481,17 @@ export default function DashboardPanel() {
                       className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center cursor-pointer hover:bg-amber-50 hover:border-amber-100 transition-colors group col-span-1 md:col-span-2 lg:col-span-1"
                     >
                       <div className="bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-colors p-4 rounded-2xl mr-5 relative">
-                        {pendingCustomers.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full animate-pulse transform translate-x-1/3 -translate-y-1/3 shadow-sm"></span>}
+                        {stats.pendingCount > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full animate-pulse transform translate-x-1/3 -translate-y-1/3 shadow-sm"></span>}
                         <Clock className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest group-hover:text-amber-600 transition-colors">Pending</p>
-                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight group-hover:text-amber-700 transition-colors">{pendingCustomers.length}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight group-hover:text-amber-700 transition-colors">
+                          {statsLoading ? <Loader2 className="w-4 h-4 animate-spin my-1" /> : (stats.pendingCount || 0)}
+                        </p>
                       </div>
                     </div>
                   </div>
-                  
-                  {loading && (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-400 bg-white rounded-3xl border border-slate-100">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-4" />
-                      <p className="font-medium text-sm">Loading dashboard data...</p>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -372,12 +502,12 @@ export default function DashboardPanel() {
                     <p className="text-sm text-slate-500 mt-1">Review and confirm new customers before they enter the system.</p>
                   </div>
                   
-                  {loading ? (
+                  {pendLoading ? (
                     <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-100">
                       <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-4" />
                       <p className="font-medium text-sm text-slate-400">Loading pending customers...</p>
                     </div>
-                  ) : pendingCustomers.length === 0 ? (
+                  ) : pending.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 bg-white rounded-3xl border border-slate-100 text-center shadow-xl shadow-slate-200/40">
                       <div className="bg-slate-50 p-6 rounded-full mb-6">
                         <Clock className="w-12 h-12 text-slate-300" />
@@ -386,16 +516,16 @@ export default function DashboardPanel() {
                       <p className="text-slate-500 max-w-sm">All new customers have been confirmed. You're all caught up!</p>
                     </div>
                   ) : (
-                    <div className="bg-white rounded-3xl shadow-xl shadow-amber-200/20 border border-amber-200 overflow-hidden">
-                      <div className="bg-amber-50 px-6 py-4 border-b border-amber-200 flex justify-between items-center">
+                    <div className="bg-white rounded-3xl shadow-xl shadow-amber-200/20 border border-amber-200 overflow-hidden flex flex-col">
+                      <div className="bg-amber-50 px-6 py-4 border-b border-amber-200 flex justify-between items-center shrink-0">
                         <h3 className="font-bold text-amber-800 flex items-center">
                           <span className="w-2 h-2 rounded-full bg-amber-500 mr-3 animate-pulse"></span>
-                          {pendingCustomers.length} Customer{pendingCustomers.length > 1 ? 's' : ''} Waiting
+                          {stats.pendingCount} Customer{stats.pendingCount > 1 ? 's' : ''} Waiting
                         </h3>
                       </div>
-                      <table className="w-full text-left border-collapse">
+                      <table className="w-full text-left border-collapse shrink-0">
                           <tbody>
-                            {pendingCustomers.map((customer) => (
+                            {pending.map((customer) => (
                               <tr key={customer._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
                                 <td className="px-6 py-5">
                                   <div className="flex items-center">
@@ -424,7 +554,8 @@ export default function DashboardPanel() {
                                               try {
                                                 await axios.delete(`${API_BASE}/customers/${customer._id}`);
                                                 toast.success("Customer and bills discarded");
-                                                await fetchDashboard();
+                                                await fetchPending();
+                                                await fetchStats();
                                               } catch (err) {
                                                 toast.error(err.response?.data?.error || "Failed to delete customer");
                                               }
@@ -449,6 +580,7 @@ export default function DashboardPanel() {
                             ))}
                           </tbody>
                       </table>
+                      <PaginationControls currentPage={pendPage} totalPages={pendTotalPages} onPageChange={setPendPage} />
                     </div>
                   )}
                 </div>
@@ -478,13 +610,13 @@ export default function DashboardPanel() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
-                    {loading ? (
+                  <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden flex flex-col">
+                    {custLoading ? (
                       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                         <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-4" />
                         <p className="font-medium text-sm">Loading customers...</p>
                       </div>
-                    ) : confirmedCustomers.length === 0 ? (
+                    ) : customers.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
                         <div className="bg-slate-50 p-6 rounded-full mb-6">
                           <Users className="w-12 h-12 text-slate-300" />
@@ -493,57 +625,135 @@ export default function DashboardPanel() {
                         <p className="text-slate-500 max-w-sm mb-6">There are no confirmed customers matching your search or filters.</p>
                       </div>
                     ) : (
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] uppercase tracking-widest font-black">
-                            <th className="px-6 py-4 rounded-tl-3xl">Customer Name</th>
-                            <th className="px-6 py-4 text-center">Bills</th>
-                            <th className="px-6 py-4">Revenue Contribution</th>
-                            <th className="px-6 py-4">Total GST</th>
-                            <th className="px-6 py-4 text-right rounded-tr-3xl">Details</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {confirmedCustomers.filter(c => 
-                            c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (c.mobileNumber && c.mobileNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                            (c.contactInfo && c.contactInfo.toLowerCase().includes(searchTerm.toLowerCase()))
-                          ).map((customer) => (
-                            <tr key={customer._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
-                              <td className="px-6 py-5">
-                                <div className="flex items-center">
-                                  <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold mr-4">
-                                    {customer.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div className="flex flex-col">
-                                    <span className="font-bold text-slate-800">{customer.name}</span>
-                                    {(customer.mobileNumber || customer.contactInfo) && (
-                                      <span className="text-[10px] font-bold text-slate-400 mt-1 tracking-wider uppercase">{customer.mobileNumber || customer.contactInfo}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-5 text-center">
-                                <span className="px-2 py-1 bg-slate-100/80 rounded-lg text-xs font-bold text-slate-600 border border-slate-200">{customer.totalBills}</span>
-                              </td>
-                              <td className="px-6 py-5">
-                                <span className="font-bold text-slate-700">₹{(customer.totalSpent || 0).toFixed(2)}</span>
-                              </td>
-                              <td className="px-6 py-5">
-                                <span className="font-bold text-orange-600">₹{(customer.totalTax || 0).toFixed(2)}</span>
-                              </td>
-                              <td className="px-6 py-5 text-right">
-                                <button 
-                                  onClick={() => handleViewCustomerDetail(customer)}
-                                  className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline transition-all"
-                                >
-                                  View All Bills
-                                </button>
-                              </td>
+                      <>
+                        <table className="w-full text-left border-collapse shrink-0">
+                          <thead>
+                            <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] uppercase tracking-widest font-black">
+                              <th className="px-6 py-4 rounded-tl-3xl">Customer Name</th>
+                              <th className="px-6 py-4 text-center">Bills</th>
+                              <th className="px-6 py-4">Revenue Contribution</th>
+                              <th className="px-6 py-4">Total GST</th>
+                              <th className="px-6 py-4 text-right rounded-tr-3xl">Details</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {customers.map((customer) => (
+                              <tr key={customer._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
+                                <td className="px-6 py-5">
+                                  <div className="flex items-center">
+                                    <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold mr-4">
+                                      {customer.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-slate-800">{customer.name}</span>
+                                      {(customer.mobileNumber || customer.contactInfo) && (
+                                        <span className="text-[10px] font-bold text-slate-400 mt-1 tracking-wider uppercase">{customer.mobileNumber || customer.contactInfo}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-5 text-center">
+                                  <span className="px-2 py-1 bg-slate-100/80 rounded-lg text-xs font-bold text-slate-600 border border-slate-200">{customer.totalBills}</span>
+                                </td>
+                                <td className="px-6 py-5">
+                                  <span className="font-bold text-slate-700">₹{(customer.totalSpent || 0).toFixed(2)}</span>
+                                </td>
+                                <td className="px-6 py-5">
+                                  <span className="font-bold text-orange-600">₹{(customer.totalTax || 0).toFixed(2)}</span>
+                                </td>
+                                <td className="px-6 py-5 text-right">
+                                  <button 
+                                    onClick={() => handleViewCustomerDetail(customer)}
+                                    className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline transition-all"
+                                  >
+                                    View All Bills
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <PaginationControls currentPage={custPage} totalPages={custTotalPages} onPageChange={setCustPage} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'vendors' && (
+                <div className="animate-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
+                    <div>
+                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Vendor Management</h2>
+                      <p className="text-sm text-slate-500 mt-1">Track liabilities and performance of internal vendors.</p>
+                    </div>
+                    <div className="mt-6 md:mt-0 flex flex-col md:flex-row items-center gap-3">
+                      <input 
+                        type="text"
+                        placeholder="Search Vendors..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="bg-white border border-slate-200 rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500/20 w-full md:w-64 lg:w-80 shadow-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden flex flex-col">
+                    {venLoading ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                        <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-4" />
+                        <p className="font-medium text-sm">Loading vendors...</p>
+                      </div>
+                    ) : vendors.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+                        <div className="bg-slate-50 p-6 rounded-full mb-6">
+                          <DollarSign className="w-12 h-12 text-slate-300" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">No vendors found</h3>
+                        <p className="text-slate-500 max-w-sm mb-6">There are no vendors matching your search or filters.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <table className="w-full text-left border-collapse shrink-0">
+                          <thead>
+                            <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[10px] uppercase tracking-widest font-black">
+                              <th className="px-6 py-4 rounded-tl-3xl">Vendor Name</th>
+                              <th className="px-6 py-4 text-center">Invoices Logged</th>
+                              <th className="px-6 py-4">Total Payables</th>
+                              <th className="px-6 py-4">Tax Component</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vendors.map((vendor) => (
+                              <tr key={vendor._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
+                                <td className="px-6 py-5">
+                                  <div className="flex items-center">
+                                    <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center font-bold mr-4">
+                                      {vendor.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-slate-800">{vendor.name}</span>
+                                      {(vendor.gstNumber) && (
+                                        <span className="text-[10px] font-bold text-slate-400 mt-1 tracking-wider uppercase">GST: {vendor.gstNumber}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-5 text-center">
+                                  <span className="px-2 py-1 bg-slate-100/80 rounded-lg text-xs font-bold text-slate-600 border border-slate-200">{vendor.totalBills}</span>
+                                </td>
+                                <td className="px-6 py-5">
+                                  <span className="font-bold text-slate-700">₹{(vendor.totalOwed || 0).toFixed(2)}</span>
+                                </td>
+                                <td className="px-6 py-5">
+                                  <span className="font-bold text-orange-600">₹{(vendor.totalTax || 0).toFixed(2)}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <PaginationControls currentPage={venPage} totalPages={venTotalPages} onPageChange={setVenPage} />
+                      </>
                     )}
                   </div>
                 </div>
@@ -568,11 +778,11 @@ export default function DashboardPanel() {
                   </button>
                   <div className="bg-blue-50 text-primary-700 px-4 py-2.5 rounded-xl border border-primary-100 flex items-center">
                     <p className="text-[10px] font-black uppercase mr-3">Customer Revenue</p>
-                    <p className="font-bold text-sm">₹{filteredBills.reduce((s, b) => s + b.totalAmount, 0).toFixed(2)}</p>
+                    <p className="font-bold text-sm">₹{(activeCustomer?.totalSpent || 0).toFixed(2)}</p>
                   </div>
                   <div className="bg-orange-50 text-orange-700 px-4 py-2.5 rounded-xl border border-orange-100 flex items-center">
                     <p className="text-[10px] font-black uppercase mr-3">Total GST</p>
-                    <p className="font-bold text-sm">₹{filteredBills.reduce((s, b) => s + b.taxAmount, 0).toFixed(2)}</p>
+                    <p className="font-bold text-sm">₹{(activeCustomer?.totalTax || 0).toFixed(2)}</p>
                   </div>
                   <div className="flex items-center space-x-4 bg-white p-2 border border-slate-100 rounded-xl shadow-sm">
                     <div className="flex items-center space-x-2">
@@ -598,8 +808,8 @@ export default function DashboardPanel() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40 border border-slate-100">
-                <div className="flex items-center mb-8">
+              <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40 border border-slate-100 flex flex-col">
+                <div className="flex items-center mb-8 shrink-0">
                   <div className="w-16 h-16 rounded-2xl bg-primary-500 text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-primary-500/20 mr-6">
                     {activeCustomer?.name.charAt(0).toUpperCase()}
                   </div>
@@ -609,7 +819,7 @@ export default function DashboardPanel() {
                   </div>
                 </div>
 
-                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                <div className="border border-slate-100 rounded-2xl overflow-hidden shrink-0">
                   <table className="w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                       <tr>
@@ -622,12 +832,19 @@ export default function DashboardPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredBills.length === 0 ? (
+                      {billLoading ? (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-12 text-center text-slate-400">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-primary-400" />
+                            Loading bills...
+                          </td>
+                        </tr>
+                      ) : bills.length === 0 ? (
                         <tr>
                           <td colSpan="6" className="px-6 py-12 text-center text-slate-400 italic">No bills found for the selected date range.</td>
                         </tr>
                       ) : (
-                        filteredBills.map((bill) => (
+                        bills.map((bill) => (
                           <React.Fragment key={bill._id}>
                             <tr 
                               onClick={() => editingBillId !== bill._id && setExpandedInvoice(expandedInvoice === bill._id ? null : bill._id)}
@@ -764,17 +981,8 @@ export default function DashboardPanel() {
                       )}
                     </tbody>
                   </table>
+                  {!billLoading && <PaginationControls currentPage={billPage} totalPages={billTotalPages} onPageChange={setBillPage} />}
                 </div>
-                {filteredBills.length > 0 && (
-                  <div className="mt-6 flex justify-end">
-                    <div className="bg-white border border-slate-100 rounded-2xl px-6 py-4 text-right shadow-lg">
-                      <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Bill Balance for Range</p>
-                      <p className="text-2xl font-black text-primary-600">
-                        ₹{filteredBills.reduce((s, b) => s + b.totalAmount, 0).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}

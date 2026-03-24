@@ -12,6 +12,7 @@ const billSchema = new mongoose.Schema({
   invoiceNumber: { type: String, required: true },
   invoiceDate: { type: String },
   vendorName: { type: String, required: true },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
   vendorGstNumber: { type: String },
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   customerGstNumber: { type: String },

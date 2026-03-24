@@ -110,8 +110,23 @@ exports.handleWebhook = async (req, res) => {
       });
 
       if (!existingBill) {
+        // Find or create Vendor
+        const Vendor = require('../models/Vendor');
+        let vendorObj = await Vendor.findOne({ name: extractedData.vendorName });
+        if (!vendorObj) {
+          vendorObj = new Vendor({
+            name: extractedData.vendorName,
+            gstNumber: extractedData.vendorGstNumber || ''
+          });
+          await vendorObj.save();
+        } else if (extractedData.vendorGstNumber && !vendorObj.gstNumber) {
+          vendorObj.gstNumber = extractedData.vendorGstNumber;
+          await vendorObj.save();
+        }
+
         const bill = new Bill({
           ...extractedData,
+          vendorId: vendorObj._id,
           customer: customer._id
         });
         await bill.save();

@@ -57,12 +57,27 @@ exports.saveBill = async (req, res) => {
       notifier.sendNewCustomerAlert(customerName).catch(err => console.error("WhatsApp Error:", err));
     }
 
+    // 2.5 Find or create Vendor
+    const Vendor = require('../models/Vendor');
+    let vendor = await Vendor.findOne({ name: vendorName });
+    if (!vendor) {
+      vendor = new Vendor({
+        name: vendorName,
+        gstNumber: vendorGstNumber || ''
+      });
+      await vendor.save();
+    } else if (vendorGstNumber && !vendor.gstNumber) {
+      vendor.gstNumber = vendorGstNumber;
+      await vendor.save();
+    }
+
     // 3. Create bill
     const bill = new Bill({
       invoiceNumber,
       invoiceDate,
       vendorName,
       vendorGstNumber,
+      vendorId: vendor._id,
       customer: customer._id,
       customerGstNumber,
       items,

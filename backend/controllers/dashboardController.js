@@ -1,65 +1,125 @@
 const Customer = require('../models/Customer');
 const Bill = require('../models/Bill');
 
-exports.getDashboardData = async (req, res) => {
+exports.getDashboardStats = async (req, res) => {
   try {
     const { month, year } = req.query;
     
-    // 1. Get all customers
-    const customers = await Customer.find().lean();
-    console.log(`Found ${customers.length} customers`);
-    
-    // 2. We want to show how many bills and total amount each customer has
-    const dashboardData = await Promise.all(customers.map(async (customer) => {
-      let query = { customer: customer._id };
-      
-      // Add date filtering if month/year are provided
-      if (month && year && (month !== 'all' || year !== 'all') && month !== 'NaN') {
+    // Date filtering logic
+    let dateFilter = {};
+    if (month && year && (month !== 'all' || year !== 'all') && month !== 'NaN') {
         let regexPattern = '^';
-        if (year !== 'all') {
-          regexPattern += String(year);
-        } else {
-          regexPattern += '\\d{4}'; // Any 4-digit year
-        }
-        
+        if (year !== 'all') regexPattern += String(year);
+        else regexPattern += '\\d{4}';
         regexPattern += '-';
-        
-        if (month !== 'all') {
-          regexPattern += String(month).padStart(2, '0');
-        } else {
-          regexPattern += '\\d{2}'; // Any 2-digit month
-        }
-        
-        // Match invoiceDate starting with YYYY-MM
-        query.invoiceDate = { $regex: new RegExp(regexPattern) };
-        console.log(`Filtering customer ${customer.name} with query:`, query);
-      }
+        if (month !== 'all') regexPattern += String(month).padStart(2, '0');
+        else regexPattern += '\\d{2}';
+        dateFilter.invoiceDate = { $regex: new RegExp(regexPattern) };
+    }
 
-      const bills = await Bill.find(query).sort({ date: -1 }).lean();
-      const totalSpent = bills.reduce((sum, bill) => sum + (bill.totalAmount || 0), 0);
-      const totalTax = bills.reduce((sum, bill) => sum + (bill.taxAmount || 0), 0);
-      console.log(`Customer ${customer.name}: ${bills.length} bills, ${totalSpent} spent, ${totalTax} tax`);
-      
+    const confirmedCustomers = await Customer.find({ status: { $ne: 'pending' } }).select('_id').lean();
+    const confirmedIds = confirmedCustomers.map(c => c._id);
+    
+    const billMatch = { customer: { $in: confirmedIds }, ...dateFilter };
+    
+    const statsResult = await Bill.aggregate([
+      { $match: billMatch },
+      { $group: {
+        _id: null,
+        totalRevenue: { $sum: "$totalAmount" },
+        totalTax: { $sum: "$taxAmount" },
+        totalBills: { $sum: 1 }
+      }}
+    ]);
+
+    const stats = statsResult[0] || { totalRevenue: 0, totalTax: 0, totalBills: 0 };
+    
+    const pendingCount = await Customer.countDocuments({ status: 'pending' });
+    const confirmedCount = confirmedIds.length;
+
+    res.json({
+      revenue: stats.totalRevenue,
+      tax: stats.totalTax,
+      billsCount: stats.totalBills,
+      pendingCount,
+      confirmedCount
+    });
+  } catch (err) {
+    console.error("Dashboard Stats Fetch Error:", err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+};
+
+exports.getCustomersPaginated = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const status = req.query.status; // 'pending' or 'confirmed'
+    const search = req.query.search || '';
+
+    const query = {};
+    if (status) {
+      if (status === 'confirmed') query.status = { $ne: 'pending' };
+      else query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { mobileNumber: { $regex: search, $options: 'i' } },
+        { contactInfo: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const total = await Customer.countDocuments(query);
+    const customers = await Customer.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    const customerIds = customers.map(c => c._id);
+    const billsStats = await Bill.aggregate([
+      { $match: { customer: { $in: customerIds } } },
+      { $group: {
+         _id: "$customer",
+         totalSpent: { $sum: "$totalAmount" },
+         totalTax: { $sum: "$taxAmount" },
+         totalBills: { $sum: 1 }
+      }}
+    ]);
+
+    const statsMap = {};
+    billsStats.forEach(stat => {
+      statsMap[stat._id.toString()] = stat;
+    });
+
+    const enrichedCustomers = customers.map(c => {
+      const stat = statsMap[c._id.toString()] || { totalSpent: 0, totalTax: 0, totalBills: 0 };
       return {
-        ...customer,
-        totalBills: bills.length,
-        totalSpent,
-        totalTax,
-        bills
+        ...c,
+        totalSpent: stat.totalSpent,
+        totalTax: stat.totalTax,
+        totalBills: stat.totalBills
       };
-    }));
+    });
 
-    res.json(dashboardData);
+    res.json({
+      customers: enrichedCustomers,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
-    console.error("Dashboard Fetch Error:", error);
-    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    console.error("getCustomersPaginated error:", error);
+    res.status(500).json({ error: 'Failed to fetch customers' });
   }
 };
 
 exports.getCustomerBills = async (req, res) => {
   try {
     const { id } = req.params;
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, page = 1, limit = 20 } = req.query;
 
     let query = { customer: id };
     if (startDate || endDate) {
@@ -68,9 +128,21 @@ exports.getCustomerBills = async (req, res) => {
       if (endDate) query.invoiceDate.$lte = endDate;
     }
 
-    const bills = await Bill.find(query).sort({ invoiceDate: -1 }).lean();
-    res.json(bills);
+    const total = await Bill.countDocuments(query);
+    const bills = await Bill.find(query)
+      .sort({ invoiceDate: -1, date: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    res.json({
+      bills,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
+    console.error("getCustomerBills error:", error);
     res.status(500).json({ error: 'Failed to fetch customer bills' });
   }
 };
@@ -102,7 +174,6 @@ exports.deleteCustomer = async (req, res) => {
     
     // Also delete any bills associated with this customer
     await Bill.deleteMany({ customer: id });
-    
     res.json({ message: 'Customer and associated bills deleted successfully' });
   } catch (error) {
     console.error("Delete Customer Error:", error);
