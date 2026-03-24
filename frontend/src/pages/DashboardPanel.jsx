@@ -164,32 +164,57 @@ export default function DashboardPanel() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
+                    <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
                       <div className="bg-green-50 text-green-600 p-4 rounded-2xl mr-5">
-                        <DollarSign className="w-8 h-8" />
+                        <DollarSign className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedMonth === 'all' ? 'Overall Revenue' : 'Monthly Revenue'}</p>
-                        <p className="font-black text-2xl text-slate-800 tracking-tight">₹{totalRevenue.toFixed(2)}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedMonth === 'all' ? 'Overall Revenue' : 'Monthly Rev'}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">₹{totalRevenue.toFixed(0)}</p>
                       </div>
                     </div>
-                    <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center">
+                    <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
                       <div className="bg-orange-50 text-orange-600 p-4 rounded-2xl mr-5">
-                        <DollarSign className="w-8 h-8" />
+                        <DollarSign className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total GST</p>
-                        <p className="font-black text-2xl text-slate-800 tracking-tight">₹{totalTax.toFixed(2)}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">₹{totalTax.toFixed(0)}</p>
                       </div>
                     </div>
-                    <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center">
+                    <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
                       <div className="bg-blue-50 text-blue-600 p-4 rounded-2xl mr-5">
-                        <FileText className="w-8 h-8" />
+                        <FileText className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bills Count</p>
-                        <p className="font-black text-2xl text-slate-800 tracking-tight">{totalBills}</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight">{totalBills}</p>
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => setActiveTab('customers')}
+                      className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center cursor-pointer hover:bg-primary-50 hover:border-primary-100 transition-colors group col-span-1 md:col-span-1 lg:col-span-1"
+                    >
+                      <div className="bg-indigo-50 text-indigo-600 group-hover:bg-primary-100 transition-colors p-4 rounded-2xl mr-5">
+                        <Users className="w-6 h-6 md:w-8 md:h-8" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest group-hover:text-primary-600 transition-colors">Customers</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight group-hover:text-primary-700 transition-colors">{confirmedCustomers.length}</p>
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => setActiveTab('pending')}
+                      className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center cursor-pointer hover:bg-amber-50 hover:border-amber-100 transition-colors group col-span-1 md:col-span-2 lg:col-span-1"
+                    >
+                      <div className="bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-colors p-4 rounded-2xl mr-5 relative">
+                        {pendingCustomers.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full animate-pulse transform translate-x-1/3 -translate-y-1/3 shadow-sm"></span>}
+                        <Clock className="w-6 h-6 md:w-8 md:h-8" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest group-hover:text-amber-600 transition-colors">Pending</p>
+                        <p className="font-black text-xl lg:text-2xl text-slate-800 tracking-tight group-hover:text-amber-700 transition-colors">{pendingCustomers.length}</p>
                       </div>
                     </div>
                   </div>
