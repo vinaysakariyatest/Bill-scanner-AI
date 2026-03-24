@@ -56,9 +56,21 @@ export default function DashboardPanel() {
     }
   };
 
-  const totalRevenue = data.reduce((sum, cust) => sum + (cust.totalSpent || 0), 0);
-  const totalTax = data.reduce((sum, cust) => sum + (cust.totalTax || 0), 0);
-  const totalBills = data.reduce((sum, cust) => sum + (cust.totalBills || 0), 0);
+  const pendingCustomers = data.filter(c => c.status === 'pending');
+  const confirmedCustomers = data.filter(c => c.status !== 'pending');
+
+  const handleConfirmCustomer = async (customerId) => {
+    try {
+      await axios.put(`${API_BASE}/customers/${customerId}/confirm`);
+      await fetchDashboard();
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to confirm customer");
+    }
+  };
+
+  const totalRevenue = confirmedCustomers.reduce((sum, cust) => sum + (cust.totalSpent || 0), 0);
+  const totalTax = confirmedCustomers.reduce((sum, cust) => sum + (cust.totalTax || 0), 0);
+  const totalBills = confirmedCustomers.reduce((sum, cust) => sum + (cust.totalBills || 0), 0);
 
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -157,13 +169,54 @@ export default function DashboardPanel() {
             </div>
           </div>
 
+          {pendingCustomers.length > 0 && !loading && (
+            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-amber-200 overflow-hidden mb-8">
+              <div className="bg-amber-50 px-6 py-4 border-b border-amber-200 flex justify-between items-center">
+                <h3 className="font-bold text-amber-800 flex items-center">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 mr-2 animate-pulse"></span>
+                  Pending Customers
+                </h3>
+                <span className="bg-amber-200 text-amber-800 text-xs font-bold px-3 py-1 rounded-full">{pendingCustomers.length} waiting for approval</span>
+              </div>
+              <table className="w-full text-left border-collapse">
+                  <tbody>
+                    {pendingCustomers.map((customer) => (
+                      <tr key={customer._id} className="group border-b border-slate-50 transition-colors hover:bg-slate-50/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold mr-4">
+                              {customer.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800">{customer.name}</span>
+                              {(customer.mobileNumber || customer.contactInfo) && (
+                                <span className="text-xs font-semibold text-slate-400 mt-0.5">{customer.mobileNumber || customer.contactInfo}</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => handleConfirmCustomer(customer._id)}
+                            className="bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-md shadow-primary-500/20"
+                          >
+                            Confirm Customer
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+              </table>
+            </div>
+          )}
+
           <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-4" />
                 <p className="font-medium text-sm">Loading dashboard data...</p>
               </div>
-            ) : data.length === 0 ? (
+            ) : confirmedCustomers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
                 <div className="bg-slate-50 p-6 rounded-full mb-6">
                   <Users className="w-12 h-12 text-slate-300" />
@@ -183,7 +236,7 @@ export default function DashboardPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.filter(c => 
+                  {confirmedCustomers.filter(c => 
                     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                     (c.mobileNumber && c.mobileNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
                     (c.contactInfo && c.contactInfo.toLowerCase().includes(searchTerm.toLowerCase()))

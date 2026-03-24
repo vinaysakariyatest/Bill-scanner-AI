@@ -74,3 +74,19 @@ exports.getCustomerBills = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch customer bills' });
   }
 };
+
+exports.confirmCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customer = await Customer.findByIdAndUpdate(id, { status: 'confirmed' }, { new: true });
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    res.json({ message: 'Customer confirmed gracefully', customer });
+  } catch (error) {
+    console.error("Confirm Customer Error:", error);
+    res.status(500).json({ error: 'Failed to confirm customer' });
+  }
+};
