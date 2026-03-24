@@ -5,6 +5,7 @@ const WhatsAppMessage = require('../models/WhatsAppMessage');
 const Bill = require('../models/Bill');
 const Customer = require('../models/Customer');
 const scanner = require('../utils/scanner');
+const notifier = require('../utils/notifier');
 
 /**
  * Helper to download file from URL
@@ -83,6 +84,7 @@ exports.handleWebhook = async (req, res) => {
 
       // 5. Save to Bill & Customer
       // Find or create customer
+      let isNewCustomer = false;
       let customer = await Customer.findOne({ name: extractedData.customerName });
       if (!customer) {
         customer = new Customer({
@@ -91,9 +93,14 @@ exports.handleWebhook = async (req, res) => {
           mobileNumber: extractedData.customerMobileNumber || ''
         });
         await customer.save();
+        isNewCustomer = true;
       } else if (extractedData.customerMobileNumber && !customer.mobileNumber) {
         customer.mobileNumber = extractedData.customerMobileNumber;
         await customer.save();
+      }
+
+      if (isNewCustomer) {
+        notifier.sendNewCustomerAlert(extractedData.customerName).catch(err => console.error("WhatsApp Error:", err));
       }
 
       // Check for duplicate bill

@@ -1,6 +1,7 @@
 const Bill = require('../models/Bill');
 const Customer = require('../models/Customer');
 const scanner = require('../utils/scanner');
+const notifier = require('../utils/notifier');
 const fs = require('fs');
 
 exports.uploadInvoice = async (req, res) => {
@@ -37,6 +38,7 @@ exports.saveBill = async (req, res) => {
     }
 
     // 2. Find or create customer
+    let isNewCustomer = false;
     let customer = await Customer.findOne({ name: customerName });
     if (!customer) {
       customer = new Customer({
@@ -45,9 +47,14 @@ exports.saveBill = async (req, res) => {
         mobileNumber: customerMobileNumber || ''
       });
       await customer.save();
+      isNewCustomer = true;
     } else if (customerMobileNumber && !customer.mobileNumber) {
       customer.mobileNumber = customerMobileNumber;
       await customer.save();
+    }
+
+    if (isNewCustomer) {
+      notifier.sendNewCustomerAlert(customerName).catch(err => console.error("WhatsApp Error:", err));
     }
 
     // 3. Create bill
