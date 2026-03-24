@@ -27,7 +27,7 @@ function AdminLayout({ children }) {
           </button>
         </div>
       </header>
-      <main className="flex-1 p-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 flex overflow-hidden w-full">
         {children}
       </main>
     </div>
