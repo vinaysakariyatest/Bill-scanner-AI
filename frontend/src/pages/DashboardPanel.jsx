@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit, Eye, X } from 'lucide-react';
+import { Users, FileText, DollarSign, ChevronDown, ChevronUp, Loader2, Trash2, LayoutDashboard, Clock, Edit, Eye, X, IndianRupee, BadgePercent, Store } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -448,7 +448,7 @@ export default function DashboardPanel() {
             onClick={() => { setActiveTab('vendors'); setViewMode('overview'); }} 
             className={`w-full text-left px-4 py-3 rounded-xl flex items-center font-bold transition-all ${activeTab === 'vendors' && viewMode === 'overview' ? 'bg-purple-50 text-purple-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
           >
-            <DollarSign className="w-5 h-5 mr-3" /> Vendors
+            <Store className="w-5 h-5 mr-3" /> Vendors
           </button>
         </nav>
       </div>
@@ -492,7 +492,7 @@ export default function DashboardPanel() {
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
                     <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
                       <div className="bg-green-50 text-green-600 p-4 rounded-2xl mr-5">
-                        <DollarSign className="w-6 h-6 md:w-8 md:h-8" />
+                        <IndianRupee className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{selectedMonth === 'all' ? 'Overall Revenue' : 'Monthly Rev'}</p>
@@ -503,7 +503,7 @@ export default function DashboardPanel() {
                     </div>
                     <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-100 flex items-center col-span-1 md:col-span-1 lg:col-span-1">
                       <div className="bg-orange-50 text-orange-600 p-4 rounded-2xl mr-5">
-                        <DollarSign className="w-6 h-6 md:w-8 md:h-8" />
+                        <BadgePercent className="w-6 h-6 md:w-8 md:h-8" />
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total GST</p>
@@ -768,7 +768,7 @@ export default function DashboardPanel() {
                     ) : vendors.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
                         <div className="bg-slate-50 p-6 rounded-full mb-6">
-                          <DollarSign className="w-12 h-12 text-slate-300" />
+                          <Store className="w-12 h-12 text-slate-300" />
                         </div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">No vendors found</h3>
                         <p className="text-slate-500 max-w-sm mb-6">There are no vendors matching your search or filters.</p>
