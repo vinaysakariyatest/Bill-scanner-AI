@@ -29,6 +29,19 @@ export default function DashboardPanel() {
     fetchDashboard();
   }, [selectedMonth, selectedYear]);
 
+  // Rehydrate the active customer after dashboard refetches perfectly to avoid UI collapse
+  useEffect(() => {
+    if (activeCustomer && data.length > 0) {
+      const updatedCust = data.find(c => c._id === activeCustomer._id);
+      if (updatedCust) {
+        setActiveCustomer(updatedCust);
+      } else {
+        setViewMode('overview');
+        setActiveCustomer(null);
+      }
+    }
+  }, [data]);
+
   const fetchDashboard = async () => {
     setLoading(true);
     try {
@@ -81,15 +94,25 @@ export default function DashboardPanel() {
       vendorName: bill.vendorName,
       taxAmount: bill.taxAmount || 0,
       totalAmount: bill.totalAmount || 0,
+      items: bill.items ? JSON.parse(JSON.stringify(bill.items)) : []
     });
+    setExpandedInvoice(bill._id); // Auto-expand to show items while editing
   };
 
   const handleEditSave = async (billId) => {
     try {
+      const formattedItems = (editForm.items || []).map(item => ({
+        ...item,
+        qty: Number(item.qty) || 1,
+        price: Number(item.price) || 0,
+        amount: Number(item.amount) || ((Number(item.qty) || 1) * (Number(item.price) || 0))
+      }));
+
       await axios.put(`${API_BASE}/bills/${billId}`, {
         ...editForm,
         taxAmount: Number(editForm.taxAmount),
-        totalAmount: Number(editForm.totalAmount)
+        totalAmount: Number(editForm.totalAmount),
+        items: formattedItems
       });
       toast.success("Bill updated successfully!");
       setEditingBillId(null);
@@ -97,6 +120,21 @@ export default function DashboardPanel() {
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to update bill");
     }
+  };
+
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...(editForm.items || [])];
+    if (!newItems[index]) return;
+    
+    newItems[index] = { ...newItems[index], [field]: value };
+    
+    if (field === 'qty' || field === 'price') {
+      const qty = Number(newItems[index].qty) || 0;
+      const price = Number(newItems[index].price) || 0;
+      newItems[index].amount = qty * price;
+    }
+    
+    setEditForm({ ...editForm, items: newItems });
   };
 
   const pendingCustomers = data.filter(c => c.status === 'pending');
@@ -526,7 +564,7 @@ export default function DashboardPanel() {
                     onClick={handleExportBills}
                     className="bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2.5 rounded-xl border border-green-200 flex items-center shadow-sm font-bold transition-colors w-full md:w-auto justify-center mb-2 md:mb-0 md:mr-2"
                   >
-                    <FileText className="w-4 h-4 mr-2" /> Export Bills (XLSX)
+                    <FileText className="w-4 h-4 mr-2" /> Export Bills
                   </button>
                   <div className="bg-blue-50 text-primary-700 px-4 py-2.5 rounded-xl border border-primary-100 flex items-center">
                     <p className="text-[10px] font-black uppercase mr-3">Customer Revenue</p>
@@ -685,15 +723,35 @@ export default function DashboardPanel() {
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                          {bill.items?.map((item, i) => (
-                                            <tr key={i}>
-                                              <td className="px-4 py-2.5 font-medium text-slate-700">{item.productName}</td>
-                                              <td className="px-4 py-2.5 text-slate-500 uppercase">{item.hsnCode || '-'}</td>
-                                              <td className="px-4 py-2.5 text-center text-slate-600">{item.qty}</td>
-                                              <td className="px-4 py-2.5 text-right text-slate-600">₹{item.price?.toFixed(2)}</td>
-                                              <td className="px-4 py-2.5 text-right font-bold text-slate-800">₹{item.amount?.toFixed(2)}</td>
-                                            </tr>
-                                          ))}
+                                          {editingBillId === bill._id ? (
+                                            (editForm.items || []).map((item, i) => (
+                                              <tr key={i}>
+                                                <td className="px-4 py-2.5">
+                                                  <input type="text" value={item.productName || ''} onChange={(e) => handleItemChange(i, 'productName', e.target.value)} className="w-full border border-primary-200 rounded px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-primary-500/20" />
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                  <input type="text" value={item.hsnCode || ''} onChange={(e) => handleItemChange(i, 'hsnCode', e.target.value)} className="w-full border border-primary-200 rounded px-2 py-1 text-xs uppercase outline-none focus:ring-2 focus:ring-primary-500/20" />
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                  <input type="number" value={item.qty || ''} onChange={(e) => handleItemChange(i, 'qty', e.target.value)} className="w-full border border-primary-200 rounded px-2 py-1 text-xs text-center outline-none focus:ring-2 focus:ring-primary-500/20" />
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                  <input type="number" step="0.01" value={item.price || ''} onChange={(e) => handleItemChange(i, 'price', e.target.value)} className="w-full border border-primary-200 rounded px-2 py-1 text-xs text-right outline-none focus:ring-2 focus:ring-primary-500/20" />
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right font-bold text-slate-800">₹{Number(item.amount || 0).toFixed(2)}</td>
+                                              </tr>
+                                            ))
+                                          ) : (
+                                            bill.items?.map((item, i) => (
+                                              <tr key={i}>
+                                                <td className="px-4 py-2.5 font-medium text-slate-700">{item.productName}</td>
+                                                <td className="px-4 py-2.5 text-slate-500 uppercase">{item.hsnCode || '-'}</td>
+                                                <td className="px-4 py-2.5 text-center text-slate-600">{item.qty}</td>
+                                                <td className="px-4 py-2.5 text-right text-slate-600">₹{item.price?.toFixed(2)}</td>
+                                                <td className="px-4 py-2.5 text-right font-bold text-slate-800">₹{item.amount?.toFixed(2)}</td>
+                                              </tr>
+                                            ))
+                                          )}
                                         </tbody>
                                       </table>
                                     </div>
