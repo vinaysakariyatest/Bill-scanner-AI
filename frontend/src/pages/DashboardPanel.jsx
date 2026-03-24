@@ -273,7 +273,23 @@ export default function DashboardPanel() {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-5 text-right">
+                                <td className="px-6 py-5 text-right flex items-center justify-end space-x-3">
+                                  <button 
+                                    onClick={async () => {
+                                      if(window.confirm("Are you sure you want to completely reject/delete this pending customer? Their associated bills will also be deleted.")) {
+                                        try {
+                                          await axios.delete(`${API_BASE}/customers/${customer._id}`);
+                                          await fetchDashboard();
+                                        } catch (err) {
+                                          alert(err.response?.data?.error || "Failed to delete customer");
+                                        }
+                                      }
+                                    }}
+                                    className="p-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all shadow-sm active:scale-95"
+                                    title="Delete Customer"
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
                                   <button 
                                     onClick={() => handleConfirmCustomer(customer._id)}
                                     className="bg-primary-500 hover:bg-primary-600 text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all shadow-md shadow-primary-500/20 active:scale-95"

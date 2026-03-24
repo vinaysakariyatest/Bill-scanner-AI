@@ -90,3 +90,22 @@ exports.confirmCustomer = async (req, res) => {
     res.status(500).json({ error: 'Failed to confirm customer' });
   }
 };
+
+exports.deleteCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedCustomer = await Customer.findByIdAndDelete(id);
+    
+    if (!deletedCustomer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    // Also delete any bills associated with this customer
+    await Bill.deleteMany({ customer: id });
+    
+    res.json({ message: 'Customer and associated bills deleted successfully' });
+  } catch (error) {
+    console.error("Delete Customer Error:", error);
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+};
