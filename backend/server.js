@@ -15,10 +15,34 @@ app.use(express.json());
 const apiRoutes = require('./routes/api');
 app.use('/api', apiRoutes);
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/billscanner')
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log('MongoDB connection error:', err));
+// MongoDB Connection caching for Serverless
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected || mongoose.connection.readyState >= 1) {
+    isConnected = true;
+    return;
+  }
+  try {
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/billscanner', {
+      serverSelectionTimeoutMS: 5000,
+    });
+    isConnected = true;
+    console.log('MongoDB Connected');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    throw err;
+  }
+};
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
 
 // Export app for Vercel
 module.exports = app;

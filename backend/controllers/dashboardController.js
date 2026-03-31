@@ -79,15 +79,19 @@ exports.getCustomersPaginated = async (req, res) => {
       .lean();
 
     const customerIds = customers.map(c => c._id);
-    const billsStats = await Bill.aggregate([
-      { $match: { customer: { $in: customerIds } } },
-      { $group: {
-         _id: "$customer",
-         totalSpent: { $sum: "$totalAmount" },
-         totalTax: { $sum: "$taxAmount" },
-         totalBills: { $sum: 1 }
-      }}
-    ]);
+    let billsStats = [];
+    
+    if (customerIds.length > 0) {
+      billsStats = await Bill.aggregate([
+        { $match: { customer: { $in: customerIds } } },
+        { $group: {
+           _id: "$customer",
+           totalSpent: { $sum: "$totalAmount" },
+           totalTax: { $sum: "$taxAmount" },
+           totalBills: { $sum: 1 }
+        }}
+      ]);
+    }
 
     const statsMap = {};
     billsStats.forEach(stat => {
