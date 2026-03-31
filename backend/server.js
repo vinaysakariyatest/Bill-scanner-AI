@@ -11,38 +11,46 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Routes
-const apiRoutes = require('./routes/api');
-app.use('/api', apiRoutes);
-
 // MongoDB Connection caching for Serverless
-let isConnected = false;
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
-const connectDB = async () => {
-  if (isConnected || mongoose.connection.readyState >= 1) {
-    isConnected = true;
-    return;
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+  if (!cached.promise) {
+    const opts = { serverSelectionTimeoutMS: 5000 };
+    cached.promise = mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/billscanner', opts).then((mongoose) => {
+      console.log('MongoDB Connected');
+      return mongoose;
+    });
   }
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/billscanner', {
-      serverSelectionTimeoutMS: 5000,
-    });
-    isConnected = true;
-    console.log('MongoDB Connected');
+    cached.conn = await cached.promise;
+    return cached.conn;
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    cached.promise = null;
     throw err;
   }
-};
+}
 
+// Database Connection Middleware - MUST be before routes
 app.use(async (req, res, next) => {
   try {
     await connectDB();
     next();
   } catch (err) {
+    console.error('Database connection failed:', err);
     res.status(500).json({ error: 'Database connection failed' });
   }
 });
+
+// Routes
+const apiRoutes = require('./routes/api');
+app.use('/api', apiRoutes);
 
 // Export app for Vercel
 module.exports = app;
